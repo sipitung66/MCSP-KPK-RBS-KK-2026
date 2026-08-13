@@ -1,0 +1,87 @@
+// Prisma schema untuk Aplikasi MCSP KPK Inspektorat Daerah Kabupaten Konawe
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Tabel User untuk autentikasi & RBAC
+model User {
+  id         String   @id @default(uuid())
+  email      String   @unique
+  password   String
+  role       UserRole @default(ADMIN_OPD)
+  opdName    String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  // Relasi: Satu user (ADMIN_OPD) terkait dengan satu OPD
+  opd        OPDList? @relation(fields: [opdName], references: [opdName], onDelete: SetNull)
+
+  @@map("users")
+}
+
+enum UserRole {
+  ADMIN_UTAMA
+  ADMIN_OPD
+}
+
+// Daftar OPD (Organisasi Perangkat Daerah)
+model OPDList {
+  id           Int          @id @default(autoincrement())
+  opdName      String       @unique
+  createdAt    DateTime     @default(now())
+
+  // Relasi: Satu OPD bisa memiliki banyak submission dokumen
+  submissions  Submission[]
+  users        User[]
+
+  @@map("opd_list")
+}
+
+// 7 Area Strategis MCSP KPK dengan target dokumen per area
+// Total target keseluruhan = 25 + 6 + 30 + 20 + 35 + 16 + 6 = 138
+model MCSPArea {
+  id          Int          @id
+  areaName    String
+  targetDocs  Int
+  description String?
+  createdAt   DateTime     @default(now())
+
+  // Relasi: Satu area memiliki banyak submission dari berbagai OPD
+  submissions Submission[]
+
+  @@map("mcsp_areas")
+}
+
+// Submission / pengunggahan dokumen bukti dukung per OPD per area
+model Submission {
+  id           String   @id @default(uuid())
+  opdName      String
+  areaId       Int
+  documentName String
+  status       DocStatus @default(BELUM_TERPENUHI)
+  fileUrl      String?
+  note         String?
+  submittedBy  String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Composite unique constraint: Satu OPD, Satu Area, Satu Nama Dokumen hanya boleh 1 record
+  @@unique([opdName, areaId, documentName])
+
+  // Relasi
+  opd          OPDList  @relation(fields: [opdName], references: [opdName], onDelete: Cascade)
+  area         MCSPArea @relation(fields: [areaId], references: [id], onDelete: Cascade)
+
+  @@map("submissions")
+}
+
+enum DocStatus {
+  TERPENUHI
+  BELUM_TERPENUHI
+}
