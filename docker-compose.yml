@@ -17,6 +17,7 @@ services:
   app:
     build: .
     image: ${MCSP_IMAGE:-ghcr.io/sipitung66/mcsp-kpk-rbs:latest}
+    pull_policy: always
     restart: unless-stopped
     depends_on:
       db:
