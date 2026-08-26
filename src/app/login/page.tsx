@@ -3,20 +3,12 @@
 import { useState } from "react";
 import { useFormState } from "react-dom";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import { useEffect } from "react";
-import { ShieldCheck, Mail, Lock, Eye, EyeOff, Info } from "lucide-react";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { ArrowRight, Eye, EyeOff, LockKeyhole, UserRound } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/components/ui/use-toast";
 import { login, type LoginFormState } from "@/lib/actions/auth.actions";
 
@@ -46,55 +38,43 @@ export default function LoginPage() {
     }
   }, [state, router, toast]);
 
-  const getInitials = (email: string) => {
-    return email
-      .split("@")[0]
-      .split(".")
-      .map((n) => n[0]?.toUpperCase() ?? "")
-      .join("")
-      .slice(0, 2);
-  };
-
   return (
-    <div className="min-h-screen w-full bg-gradient-to-br from-slate-50 via-indigo-50 to-slate-100 flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
-        <div className="mb-8 text-center">
-          <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl gradient-gov shadow-xl mb-4">
-            <ShieldCheck className="w-10 h-10 text-white" />
+    <main className="login-page min-h-screen w-full overflow-hidden bg-[#061f3d] text-slate-900">
+      <div className="login-layout mx-auto grid min-h-screen w-full max-w-[1440px] lg:grid-cols-[1.08fr_0.92fr]">
+        <section className="login-hero relative hidden min-h-screen overflow-hidden lg:flex lg:flex-col lg:justify-end lg:p-16">
+          <div className="login-hero-photo absolute inset-0" aria-hidden="true" />
+          <div className="absolute inset-0 bg-gradient-to-t from-[#031a35] via-[#062750]/20 to-[#041d3c]/20" />
+          <div className="relative z-10 max-w-[640px] pb-8 text-white">
+            <p className="mb-4 text-sm font-semibold tracking-[0.18em] text-white/80 uppercase">Inspektorat Kabupaten Konawe</p>
+            <h1 className="max-w-[590px] text-4xl font-bold leading-[1.14] tracking-tight xl:text-[42px]">&quot;Korupsi Menghancurkan Tatanan Bangsa. Pemerintah Kabupaten Konawe Berkomitmen Penuh: Tolak, Cegah, dan Lawan Korupsi demi Konawe yang Berintegritas!&quot;</h1>
+            <div className="mt-5 h-1 w-16 bg-[#ffd500]" />
           </div>
-          <h2 className="text-sm font-bold tracking-widest text-indigo-700 uppercase mb-2">
-            Inspektorat Daerah
-          </h2>
-          <h1 className="text-xl font-extrabold text-slate-800 leading-tight">
-            Kabupaten Konawe
-          </h1>
-        </div>
+        </section>
 
-        <Card className="w-full shadow-2xl border-0 overflow-hidden">
-          <div className="h-1.5 gradient-gov" />
-          <CardHeader className="space-y-2 pb-6 pt-8">
-            <CardTitle className="text-2xl font-bold text-center gradient-gov-text leading-tight">
-              Aplikasi Monitoring &amp; Pemenuhan Dokumen
-            </CardTitle>
-            <CardDescription className="text-center text-base text-slate-600 font-medium">
-              MCSP KPK - Sistem Pelaporan Berbasis Data untuk Pencegahan Korupsi
-            </CardDescription>
-          </CardHeader>
+        <section className="flex min-h-screen flex-col items-center justify-center bg-[#f1f2f4] px-5 py-10 sm:px-10">
+          <div className="w-full max-w-[410px]">
+            <div className="mb-7 text-center">
+              <div className="mb-5 flex items-center justify-center gap-5" aria-label="Logo KPK dan Kabupaten Konawe">
+                <Image src="/logos/kpk%20clean.png" alt="Logo KPK" width={48} height={54} className="h-[54px] w-auto object-contain" priority />
+                <Image src="/logos/konawe%20clean.png" alt="Logo Kabupaten Konawe" width={48} height={54} className="h-[54px] w-auto object-contain" priority />
+              </div>
+              <Image src="/logos/Logo%20MCSP%20KPK%20RBS.jpg" alt="Logo MCSP KPK RBS" width={112} height={58} className="mx-auto mb-5 h-[58px] w-28 object-contain" priority />
+              <h2 className="text-[25px] font-bold tracking-tight text-[#092b4d]">MCP KPK</h2>
+              <p className="mt-1 text-sm font-semibold text-slate-500">Inspektorat Kabupaten Konawe</p>
+              <div className="mx-auto mt-3 h-1 w-14 bg-[#f4cf00]" />
+            </div>
 
-          <CardContent>
-            <form action={formAction} className="space-y-5">
+          <form action={formAction} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="email" className="text-sm font-semibold text-slate-700">
-                  Alamat Email
-                </Label>
+                <Label htmlFor="email" className="text-[11px] font-semibold text-slate-600">Username atau Email</Label>
                 <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                  <UserRound className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                   <Input
                     id="email"
                     name="email"
                     type="email"
-                    placeholder="nama.opd@konawekab.go.id"
-                    className="pl-10 h-11 text-base border-slate-200 focus-visible:ring-indigo-500"
+                    placeholder="Masukkan username"
+                    className="h-10 rounded-xl border-slate-300 bg-white pl-9 text-xs shadow-none focus-visible:ring-[#0a477c]"
                     autoComplete="email"
                     required
                   />
@@ -103,107 +83,48 @@ export default function LoginPage() {
 
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <Label htmlFor="password" className="text-sm font-semibold text-slate-700">
-                    Kata Sandi
-                  </Label>
-                  <a
-                    href="#"
-                    onClick={(e) => e.preventDefault()}
-                    className="text-xs font-medium text-indigo-600 hover:text-indigo-700 opacity-60 cursor-not-allowed"
-                  >
-                    Lupa kata sandi?
-                  </a>
+                  <Label htmlFor="password" className="text-[11px] font-semibold text-slate-600">Password</Label>
                 </div>
                 <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-                  <Input
-                    id="password"
-                    name="password"
-                    type={showPassword ? "text" : "password"}
-                    placeholder="Masukkan kata sandi"
-                    className="pl-10 pr-11 h-11 text-base border-slate-200 focus-visible:ring-indigo-500"
-                    autoComplete="current-password"
-                    required
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
-                    tabIndex={-1}
-                  >
-                    {showPassword ? (
-                      <EyeOff className="w-5 h-5" />
-                    ) : (
-                      <Eye className="w-5 h-5" />
-                    )}
-                  </button>
-                </div>
+                    <LockKeyhole className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                    <Input
+                      id="password"
+                      name="password"
+                      type={showPassword ? "text" : "password"}
+                      placeholder="Masukkan password"
+                      className="h-10 rounded-xl border-slate-300 bg-white pl-9 pr-10 text-xs shadow-none focus-visible:ring-[#0a477c]"
+                      autoComplete="current-password"
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 transition-colors hover:text-slate-600"
+                      aria-label={showPassword ? "Sembunyikan password" : "Tampilkan password"}
+                    >
+                      {showPassword ? (
+                        <EyeOff className="h-4 w-4" />
+                      ) : (
+                        <Eye className="h-4 w-4" />
+                      )}
+                    </button>
+                  </div>
               </div>
 
-              <Button
-                type="submit"
-                className="w-full h-11 text-base font-semibold gradient-gov shadow-lg hover:shadow-xl hover:opacity-95 transition-all"
-              >
-                Masuk ke Sistem
-              </Button>
+              <div className="flex items-center justify-between pt-0.5 text-[10px] text-slate-500">
+                <label className="flex items-center gap-1.5"><input type="checkbox" className="h-3 w-3 rounded border-slate-300 accent-[#07518c]" />Ingat Saya</label>
+                <span className="font-bold text-[#07518c]">Lupa Password?</span>
+              </div>
+              <Button type="submit" className="h-10 w-full rounded-xl bg-[#06477f] text-xs font-bold shadow-md transition-colors hover:bg-[#05375f]">Masuk <ArrowRight className="ml-1 h-4 w-4" /></Button>
             </form>
-          </CardContent>
-
-          <CardFooter className="flex-col space-y-3 border-t border-slate-100 bg-slate-50/50 p-6">
-            <div className="w-full">
-              <div className="flex items-center gap-2 mb-3">
-                <Info className="w-4 h-4 text-indigo-500" />
-                <p className="text-xs font-semibold text-indigo-700 uppercase tracking-wide">
-                  Kredensial Demo
-                </p>
-              </div>
-              <div className="space-y-2.5">
-                <div className="rounded-lg border border-indigo-100 bg-white p-3 shadow-sm">
-                  <div className="flex items-center gap-2 mb-1">
-                    <Badge variant="default" className="text-[10px] px-2 py-0 font-bold">
-                      ADMIN UTAMA
-                    </Badge>
-                    <div className="w-6 h-6 rounded-full bg-indigo-100 flex items-center justify-center text-[10px] font-bold text-indigo-700">
-                      {getInitials("admin.mcsp@konawekab.go.id")}
-                    </div>
-                  </div>
-                  <p className="text-xs font-medium text-slate-700">
-                    admin.mcsp@konawekab.go.id
-                  </p>
-                  <p className="text-xs text-slate-500 font-mono">
-                    AdminMCSP@Konawe2026!
-                  </p>
-                </div>
-
-                <div className="rounded-lg border border-emerald-100 bg-white p-3 shadow-sm">
-                  <div className="flex items-center gap-2 mb-1">
-                    <Badge variant="success" className="text-[10px] px-2 py-0 font-bold">
-                      ADMIN OPD
-                    </Badge>
-                    <div className="w-6 h-6 rounded-full bg-emerald-100 flex items-center justify-center text-[10px] font-bold text-emerald-700">
-                      {getInitials("admin.bkpsdm@konawekab.go.id")}
-                    </div>
-                  </div>
-                  <p className="text-xs font-medium text-slate-700">
-                    admin.bkpsdm@konawekab.go.id
-                  </p>
-                  <p className="text-xs text-slate-500 font-mono">
-                    AdminOPD@123
-                  </p>
-                </div>
-              </div>
-            </div>
-          </CardFooter>
-        </Card>
-
-        <div className="mt-6 text-center">
-          <p className="text-xs text-slate-500">
-            &copy; {new Date().getFullYear()} Inspektorat Daerah Kabupaten Konawe.
-            <br />
-            MCSP KPK - Monitoring dan Pengendalian Pencegahan Korupsi
-          </p>
-        </div>
+            <div className="mt-6 flex items-center justify-center gap-2 text-[10px] text-slate-400"><LockKeyhole className="h-3 w-3" />Sistem Terenkripsi &amp; Terawasi</div>
+          </div>
+          <footer className="mt-auto pt-10 text-center text-[9px] leading-5 text-slate-400">
+            <p>&copy; 2024 Inspektorat Kabupaten Konawe. All Rights Reserved.</p>
+            <p>Privacy Policy <span className="mx-2">•</span> Terms of Service <span className="mx-2">•</span> Help Desk</p>
+          </footer>
+        </section>
       </div>
-    </div>
+    </main>
   );
 }

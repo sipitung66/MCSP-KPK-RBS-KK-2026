@@ -81,7 +81,7 @@ export function Sidebar({ user }: SidebarProps) {
           <span className="text-white font-extrabold text-sm tracking-wider leading-tight">
             MCSP KONAWE
           </span>
-          <span className="text-indigo-300 text-[10px] font-semibold tracking-widest">
+          <span className="text-amber-300 text-[10px] font-semibold tracking-widest">
             2026 EDITION
           </span>
         </div>
@@ -111,14 +111,14 @@ export function Sidebar({ user }: SidebarProps) {
               className={cn(
                 "group flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200",
                 isActive
-                  ? "bg-gradient-to-r from-indigo-600/90 to-indigo-500/70 text-white shadow-lg shadow-indigo-900/30"
+                  ? "bg-gradient-to-r from-teal-700 to-teal-600 text-white shadow-lg shadow-teal-950/30"
                   : "text-slate-300 hover:text-white hover:bg-slate-800/60"
               )}
             >
               <Icon
                 className={cn(
                   "w-5 h-5 shrink-0 transition-colors",
-                  isActive ? "text-white" : "text-slate-400 group-hover:text-indigo-300"
+                  isActive ? "text-white" : "text-slate-400 group-hover:text-teal-300"
                 )}
               />
               <span className="truncate">{item.label}</span>
@@ -132,7 +132,7 @@ export function Sidebar({ user }: SidebarProps) {
 
       <div className="border-t border-slate-800/60 p-3 space-y-3">
         <div className="flex items-center gap-3 px-2 py-2 rounded-lg bg-slate-800/40">
-          <div className="flex items-center justify-center w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-indigo-700 text-white text-sm font-bold shrink-0 shadow-md">
+          <div className="flex items-center justify-center w-10 h-10 rounded-full bg-gradient-to-br from-teal-500 to-teal-800 text-white text-sm font-bold shrink-0 shadow-md">
             {getInitials(user.email)}
           </div>
           <div className="flex-1 min-w-0">

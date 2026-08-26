@@ -27,7 +27,7 @@ export async function AppShell({
       : user.opdName ?? "Dashboard OPD");
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-[#f4f7f5]">
       <Sidebar user={user} />
       <Header title={title} subtitle={defaultSubtitle} user={user} />
       <main className="lg:ml-64 pt-28 lg:pt-20 min-h-screen">

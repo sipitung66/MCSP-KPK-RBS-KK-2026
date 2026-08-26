@@ -13,7 +13,7 @@
     --popover: 0 0% 100%;
     --popover-foreground: 222 47% 11%;
 
-    --primary: 243 75% 59%;
+    --primary: 174 72% 32%;
     --primary-foreground: 210 40% 98%;
 
     --secondary: 210 40% 96%;
@@ -22,7 +22,7 @@
     --muted: 210 40% 96%;
     --muted-foreground: 215 16% 47%;
 
-    --accent: 238 83% 67%;
+    --accent: 38 92% 50%;
     --accent-foreground: 210 40% 98%;
 
     --destructive: 0 84% 60%;
@@ -36,18 +36,18 @@
 
     --border: 214 32% 91%;
     --input: 214 32% 91%;
-    --ring: 243 75% 59%;
+    --ring: 174 72% 32%;
 
     --radius: 0.5rem;
 
     --sidebar-background: 222 47% 11%;
     --sidebar-foreground: 210 40% 98%;
-    --sidebar-primary: 243 75% 59%;
+    --sidebar-primary: 174 72% 32%;
     --sidebar-primary-foreground: 210 40% 98%;
     --sidebar-accent: 217 33% 17%;
     --sidebar-accent-foreground: 210 40% 98%;
     --sidebar-border: 217 33% 17%;
-    --sidebar-ring: 243 75% 59%;
+    --sidebar-ring: 174 72% 32%;
   }
 
   .dark {
@@ -60,7 +60,7 @@
     --popover: 222 47% 11%;
     --popover-foreground: 210 40% 98%;
 
-    --primary: 243 75% 59%;
+    --primary: 174 72% 42%;
     --primary-foreground: 210 40% 98%;
 
     --secondary: 217 33% 17%;
@@ -69,7 +69,7 @@
     --muted: 217 33% 17%;
     --muted-foreground: 215 20% 65%;
 
-    --accent: 217 33% 17%;
+    --accent: 38 92% 50%;
     --accent-foreground: 210 40% 98%;
 
     --destructive: 0 63% 31%;
@@ -83,16 +83,16 @@
 
     --border: 217 33% 17%;
     --input: 217 33% 17%;
-    --ring: 243 75% 59%;
+    --ring: 174 72% 42%;
 
     --sidebar-background: 217 33% 17%;
     --sidebar-foreground: 210 40% 98%;
-    --sidebar-primary: 243 75% 59%;
+    --sidebar-primary: 174 72% 42%;
     --sidebar-primary-foreground: 210 40% 98%;
     --sidebar-accent: 222 47% 11%;
     --sidebar-accent-foreground: 210 40% 98%;
     --sidebar-border: 222 47% 11%;
-    --sidebar-ring: 243 75% 59%;
+    --sidebar-ring: 174 72% 42%;
   }
 }
 
@@ -103,6 +103,7 @@
   body {
     @apply bg-background text-foreground antialiased;
     font-feature-settings: "rlig" 1, "calt" 1;
+    background-image: radial-gradient(circle at 10% 0%, hsl(174 72% 32% / 0.06), transparent 28rem), radial-gradient(circle at 90% 12%, hsl(38 92% 50% / 0.07), transparent 24rem);
   }
 }
 
@@ -157,8 +158,8 @@
   .gradient-gov {
     background: linear-gradient(
       135deg,
-      hsl(243 75% 59%) 0%,
-      hsl(238 83% 67%) 50%,
+      hsl(174 72% 32%) 0%,
+      hsl(181 65% 38%) 52%,
       hsl(222 47% 11%) 100%
     );
   }
@@ -166,11 +167,23 @@
   .gradient-gov-text {
     background: linear-gradient(
       135deg,
-      hsl(243 75% 59%) 0%,
-      hsl(238 83% 67%) 100%
+      hsl(174 72% 28%) 0%,
+      hsl(38 82% 42%) 100%
     );
     -webkit-background-clip: text;
     background-clip: text;
     -webkit-text-fill-color: transparent;
   }
+
+  .login-page { background: #061f3d; }
+  .login-hero-photo {
+    background: linear-gradient(180deg, rgba(6, 42, 79, 0.15), rgba(3, 25, 52, 0.3)), linear-gradient(155deg, #092f57 0 28%, #8e1f3f 28% 52%, #f0f1ed 52% 68%, #0b3560 68%);
+    filter: saturate(0.88);
+  }
+  .logo-kpk, .logo-kemenag {
+    display: flex; align-items: center; justify-content: center; width: 38px; height: 42px;
+    font-size: 9px; font-weight: 900; color: #c9282e; background: #fff;
+    clip-path: polygon(50% 0, 88% 12%, 94% 74%, 50% 100%, 6% 74%, 12% 12%);
+  }
+  .logo-kemenag { color: #06833f; font-size: 22px; }
 }

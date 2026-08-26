@@ -97,7 +97,7 @@ export function Header({ title, subtitle, user }: HeaderProps) {
                 <span
                   className={cn(
                     "font-medium",
-                    crumb.href ? "text-slate-500 hover:text-indigo-600" : "text-slate-700"
+                    crumb.href ? "text-slate-500 hover:text-teal-700" : "text-slate-700"
                   )}
                 >
                   {crumb.label}
@@ -119,7 +119,7 @@ export function Header({ title, subtitle, user }: HeaderProps) {
           <Button
             variant="ghost"
             size="icon"
-            className="text-slate-600 hover:text-indigo-600 hover:bg-indigo-50"
+            className="text-slate-600 hover:text-teal-700 hover:bg-teal-50"
             onClick={toggleTheme}
             title="Toggle Tema"
           >
@@ -133,7 +133,7 @@ export function Header({ title, subtitle, user }: HeaderProps) {
                   variant="ghost"
                   className="gap-2 h-10 px-2 sm:px-3 hover:bg-slate-100 data-[state=open]:bg-slate-100"
                 >
-                  <div className="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-500 to-indigo-700 text-white text-sm font-bold flex items-center justify-center shadow-sm shrink-0">
+                  <div className="w-9 h-9 rounded-full bg-gradient-to-br from-teal-500 to-teal-800 text-white text-sm font-bold flex items-center justify-center shadow-sm shrink-0">
                     {getInitials(user.email)}
                   </div>
                   <div className="hidden sm:flex flex-col items-start min-w-0">
