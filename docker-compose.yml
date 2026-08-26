@@ -28,7 +28,7 @@ services:
       DEFAULT_ADMIN_EMAIL: ${DEFAULT_ADMIN_EMAIL:?DEFAULT_ADMIN_EMAIL must be set}
       DEFAULT_ADMIN_PASSWORD: ${DEFAULT_ADMIN_PASSWORD:?DEFAULT_ADMIN_PASSWORD must be set}
     ports:
-      - "127.0.0.1:3002:3000"
+      - "3003:3000"
 
 volumes:
   postgres_data:
