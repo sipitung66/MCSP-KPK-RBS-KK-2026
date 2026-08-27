@@ -3,19 +3,35 @@ import { AppShell } from "@/components/layout/AppShell";
 import { getCurrentUser } from "@/lib/auth";
 import { getAllAreas, getAllOPDList } from "@/lib/actions/dashboard.actions";
 import { getSubmissionsByOPD } from "@/lib/actions/submissions.actions";
+import { getAllTaggingProfiles } from "@/lib/actions/tagging.actions";
+import type { OPDTaggingOverrides } from "@/lib/mcsp-rbs";
 import { SubmissionsContent } from "./_SubmissionsContent";
 
 export default async function SubmissionsPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
 
-  const [areas, opds, submissions] = await Promise.all([
+  const [areas, opds, submissions, taggingProfiles] = await Promise.all([
     getAllAreas(),
     getAllOPDList(),
     getSubmissionsByOPD(
       user.role === "ADMIN_UTAMA" ? undefined : user.opdName ?? undefined
     ),
+    getAllTaggingProfiles(),
   ]);
+
+  const taggingOverrides: OPDTaggingOverrides = {};
+  for (const profile of taggingProfiles) {
+    const current = taggingOverrides[profile.opdName] ?? { tags: profile.tags, requirements: [] };
+    current.tags = profile.tags;
+    current.requirements.push({
+      areaId: profile.areaId,
+      areaName: profile.areaName,
+      requiredDocs: profile.requiredDocs,
+      workpapers: profile.workpapers,
+    });
+    taggingOverrides[profile.opdName] = current;
+  }
 
   return (
     <AppShell title="Unggah Dokumen Bukti Dukung" subtitle="Kelola dan unggah dokumen bukti dukung MCSP">
@@ -28,6 +44,7 @@ export default async function SubmissionsPage() {
         areas={areas}
         opds={opds}
         initialSubmissions={submissions}
+        taggingOverrides={taggingOverrides}
       />
     </AppShell>
   );

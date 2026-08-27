@@ -10,6 +10,8 @@ export interface OPDTagProfile {
   requirements: AreaDocumentRequirement[];
 }
 
+export type OPDTaggingOverrides = Record<string, OPDTagProfile>;
+
 export interface OPDComplianceSnapshot {
   opdName: string;
   tags: string[];
@@ -296,29 +298,29 @@ export function normalizeOPDName(opdName: string): string {
   return opdName.trim();
 }
 
-export function getOPDTagProfile(opdName: string): OPDTagProfile {
+export function getOPDTagProfile(opdName: string, overrides?: OPDTaggingOverrides): OPDTagProfile {
   const normalized = normalizeOPDName(opdName);
-  const customProfile = OPD_TAGGING[normalized];
+  const override = overrides?.[normalized];
+  const customProfile = OPD_TAGGING[normalized] ?? DEFAULT_PROFILE;
 
-  if (customProfile) {
-    return customProfile;
-  }
+  if (!override) return customProfile;
 
+  const overrideAreas = new Map(override.requirements.map((item) => [item.areaId, item]));
   return {
-    ...DEFAULT_PROFILE,
-    tags: ["UMUM", "Kelengkapan Dokumen", "Kertas Kerja"],
+    tags: override.tags,
+    requirements: customProfile.requirements.map((item) => overrideAreas.get(item.areaId) ?? item),
   };
 }
 
-export function getRequiredDocumentsForOPD(opdName: string): AreaDocumentRequirement[] {
-  return getOPDTagProfile(opdName).requirements.map((item) => ({
+export function getRequiredDocumentsForOPD(opdName: string, overrides?: OPDTaggingOverrides): AreaDocumentRequirement[] {
+  return getOPDTagProfile(opdName, overrides).requirements.map((item) => ({
     ...item,
     workpapers: item.workpapers ?? DEFAULT_AREA_WORKPAPERS[item.areaId] ?? [],
   }));
 }
 
-export function getAreaRequiredDocumentNames(opdName: string, areaId: number): string[] {
-  const profile = getOPDTagProfile(opdName);
+export function getAreaRequiredDocumentNames(opdName: string, areaId: number, overrides?: OPDTaggingOverrides): string[] {
+  const profile = getOPDTagProfile(opdName, overrides);
   const areaRequirement = profile.requirements.find((item) => item.areaId === areaId);
 
   if (areaRequirement && areaRequirement.requiredDocs.length > 0) {
@@ -328,8 +330,8 @@ export function getAreaRequiredDocumentNames(opdName: string, areaId: number): s
   return DEFAULT_AREA_DOCUMENTS[areaId] ?? [];
 }
 
-export function getAreaRequiredWorkpapers(opdName: string, areaId: number): string[] {
-  const profile = getOPDTagProfile(opdName);
+export function getAreaRequiredWorkpapers(opdName: string, areaId: number, overrides?: OPDTaggingOverrides): string[] {
+  const profile = getOPDTagProfile(opdName, overrides);
   const areaRequirement = profile.requirements.find((item) => item.areaId === areaId);
 
   if (areaRequirement) {
@@ -341,9 +343,10 @@ export function getAreaRequiredWorkpapers(opdName: string, areaId: number): stri
 
 export function getOPDComplianceSnapshot(
   opdName: string,
-  submissions: Array<{ areaId: number; documentName?: string; status?: string }>
+  submissions: Array<{ areaId: number; documentName?: string; status?: string }>,
+  overrides?: OPDTaggingOverrides
 ): OPDComplianceSnapshot {
-  const profile = getOPDTagProfile(opdName);
+  const profile = getOPDTagProfile(opdName, overrides);
   const areaSummaries = profile.requirements.map((areaRequirement) => {
     const requiredDocs = areaRequirement.requiredDocs;
     const requiredWorkpapers = areaRequirement.workpapers ?? DEFAULT_AREA_WORKPAPERS[areaRequirement.areaId] ?? [];

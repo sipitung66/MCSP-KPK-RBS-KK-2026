@@ -46,6 +46,7 @@ import {
   getOPDComplianceSnapshot,
   getRequiredDocumentsForOPD,
 } from "@/lib/mcsp-rbs";
+import type { OPDTaggingOverrides } from "@/lib/mcsp-rbs";
 import type { MCSPArea, OPDList, Submission, DocStatus } from "@prisma/client";
 
 interface ClientUser {
@@ -69,9 +70,10 @@ interface SubmissionsContentProps {
   areas: MCSPArea[];
   opds: OPDList[];
   initialSubmissions: Submission[];
+  taggingOverrides: OPDTaggingOverrides;
 }
 
-export function SubmissionsContent({ user, areas, opds, initialSubmissions }: SubmissionsContentProps) {
+export function SubmissionsContent({ user, areas, opds, initialSubmissions, taggingOverrides }: SubmissionsContentProps) {
   const [submissions, setSubmissions] = useState<Submission[]>(initialSubmissions);
   const [saving, setSaving] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
@@ -79,9 +81,12 @@ export function SubmissionsContent({ user, areas, opds, initialSubmissions }: Su
   const [filterStatus, setFilterStatus] = useState<"all" | DocStatus>("all");
   const [activeTab, setActiveTab] = useState<string>("unggah");
   const [selectedArea, setSelectedArea] = useState<number | "">("");
+  const [evidenceType, setEvidenceType] = useState<"DOKUMEN" | "KERTAS_KERJA">("DOKUMEN");
   const [selectedDoc, setSelectedDoc] = useState<string>("");
+  const [selectedWorkpaper, setSelectedWorkpaper] = useState<string>("");
   const [status, setStatus] = useState<DocStatus>("TERPENUHI");
   const [fileUrl, setFileUrl] = useState("");
+  const [workpaperUrl, setWorkpaperUrl] = useState("");
   const [note, setNote] = useState("");
   const [expandedAreas, setExpandedAreas] = useState<Record<number, boolean>>({});
   const [filterOPD, setFilterOPD] = useState<string>("all");
@@ -98,10 +103,10 @@ export function SubmissionsContent({ user, areas, opds, initialSubmissions }: Su
       : user.opdName ?? undefined;
 
   const opdComplianceSnapshot =
-    currentOpdName ? getOPDComplianceSnapshot(currentOpdName, submissions) : null;
+    currentOpdName ? getOPDComplianceSnapshot(currentOpdName, submissions, taggingOverrides) : null;
 
   const requiredDocumentGroups = currentOpdName
-    ? getRequiredDocumentsForOPD(currentOpdName)
+    ? getRequiredDocumentsForOPD(currentOpdName, taggingOverrides)
     : [];
 
   const selectedAreaRequirement = selectedArea
@@ -122,7 +127,8 @@ export function SubmissionsContent({ user, areas, opds, initialSubmissions }: Su
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedArea || !selectedDoc) {
+    const selectedEvidence = evidenceType === "DOKUMEN" ? selectedDoc : selectedWorkpaper;
+    if (!selectedArea || !selectedEvidence) {
       toast({
         title: "Data Tidak Lengkap",
         description: "Pilih Area Strategis dan Nama Dokumen.",
@@ -150,17 +156,18 @@ export function SubmissionsContent({ user, areas, opds, initialSubmissions }: Su
       const result = await upsertSubmission(
         targetOpd,
         Number(selectedArea),
-        selectedDoc,
+        selectedEvidence,
         status,
-        fileUrl || undefined,
-        note || undefined
+        evidenceType === "DOKUMEN" ? fileUrl || undefined : undefined,
+        note || undefined,
+        evidenceType === "KERTAS_KERJA" ? workpaperUrl || undefined : undefined
       );
       if (result.success) {
         toast({
           title: "Berhasil Disimpan",
-          description: `Data "${selectedDoc}" berhasil diperbarui.`,
+          description: `Data "${selectedEvidence}" berhasil diperbarui.`,
         });
-        setSelectedDoc(""); setFileUrl(""); setNote(""); setStatus("TERPENUHI");
+        setSelectedDoc(""); setSelectedWorkpaper(""); setFileUrl(""); setWorkpaperUrl(""); setNote(""); setStatus("TERPENUHI");
         await refreshSubmissions();
       } else {
         toast({
@@ -180,6 +187,7 @@ export function SubmissionsContent({ user, areas, opds, initialSubmissions }: Su
       const result = await upsertSubmission(
         sub.opdName, sub.areaId, sub.documentName,
         newStatus, sub.fileUrl ?? undefined, sub.note ?? undefined
+        , sub.workpaperUrl ?? undefined
       );
       if (result.success) {
         toast({ title: "Status Diperbarui", description: `Status diubah menjadi ${newStatus}.` });
@@ -205,14 +213,14 @@ export function SubmissionsContent({ user, areas, opds, initialSubmissions }: Su
   const documentListForSelectedArea = selectedArea
     ? getAreaRequiredDocumentNames(
         currentOpdName ?? user.opdName ?? opds[0]?.opdName ?? "",
-        Number(selectedArea)
+        Number(selectedArea), taggingOverrides
       )
     : [];
 
   const workpaperListForSelectedArea = selectedArea
     ? getAreaRequiredWorkpapers(
         currentOpdName ?? user.opdName ?? opds[0]?.opdName ?? "",
-        Number(selectedArea)
+        Number(selectedArea), taggingOverrides
       )
     : [];
 
@@ -442,7 +450,7 @@ export function SubmissionsContent({ user, areas, opds, initialSubmissions }: Su
                     </Label>
                     <Select
                       value={String(selectedArea)}
-                      onValueChange={(v) => { setSelectedArea(Number(v)); setSelectedDoc(""); }}
+                      onValueChange={(v) => { setSelectedArea(Number(v)); setSelectedDoc(""); setSelectedWorkpaper(""); }}
                     >
                       <SelectTrigger><SelectValue placeholder="Pilih Area..." /></SelectTrigger>
                       <SelectContent>
@@ -453,20 +461,30 @@ export function SubmissionsContent({ user, areas, opds, initialSubmissions }: Su
                     </Select>
                   </div>
                   <div className="space-y-2">
+                    <Label className="text-sm font-semibold">Jenis Pemenuhan <span className="text-rose-500">*</span></Label>
+                    <Select value={evidenceType} onValueChange={(v) => { setEvidenceType(v as "DOKUMEN" | "KERTAS_KERJA"); setSelectedDoc(""); setSelectedWorkpaper(""); }} disabled={!selectedArea}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="DOKUMEN">Dokumen</SelectItem>
+                        <SelectItem value="KERTAS_KERJA">Kertas Kerja</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
                     <Label className="text-sm font-semibold">
-                      Nama Dokumen <span className="text-rose-500">*</span>
+                      {evidenceType === "DOKUMEN" ? "Nama Dokumen" : "Nama Kertas Kerja"} <span className="text-rose-500">*</span>
                     </Label>
                     <Select
-                      value={selectedDoc}
-                      onValueChange={setSelectedDoc}
+                      value={evidenceType === "DOKUMEN" ? selectedDoc : selectedWorkpaper}
+                      onValueChange={evidenceType === "DOKUMEN" ? setSelectedDoc : setSelectedWorkpaper}
                       disabled={!selectedArea}
                     >
                       <SelectTrigger>
-                        <SelectValue placeholder={selectedArea ? "Pilih dokumen..." : "Pilih Area dulu"} />
+                        <SelectValue placeholder={selectedArea ? `Pilih ${evidenceType === "DOKUMEN" ? "dokumen" : "kertas kerja"}...` : "Pilih Area dulu"} />
                       </SelectTrigger>
                       <SelectContent>
-                        {documentListForSelectedArea.map((doc, idx) => (
-                          <SelectItem key={idx} value={doc}>{doc}</SelectItem>
+                        {(evidenceType === "DOKUMEN" ? documentListForSelectedArea : workpaperListForSelectedArea).map((item, idx) => (
+                          <SelectItem key={idx} value={item}>{item}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
@@ -482,13 +500,24 @@ export function SubmissionsContent({ user, areas, opds, initialSubmissions }: Su
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-sm font-semibold">URL File Dokumen</Label>
+                    <Label className="text-sm font-semibold">{evidenceType === "DOKUMEN" ? "URL File Dokumen" : "URL Kertas Kerja"}</Label>
                     <Input
                       type="url"
                       placeholder="https://drive.google.com/..."
-                      value={fileUrl}
-                      onChange={(e) => setFileUrl(e.target.value)}
+                      value={evidenceType === "DOKUMEN" ? fileUrl : workpaperUrl}
+                      onChange={(e) => evidenceType === "DOKUMEN" ? setFileUrl(e.target.value) : setWorkpaperUrl(e.target.value)}
                     />
+                    <p className="text-[11px] text-slate-500">URL {evidenceType === "DOKUMEN" ? "file dokumen" : "file kertas kerja"} yang diunggah OPD.</p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-sm font-semibold">URL Kertas Kerja</Label>
+                    <Input
+                      type="url"
+                      placeholder="https://drive.google.com/..."
+                      value={workpaperUrl}
+                      onChange={(e) => setWorkpaperUrl(e.target.value)}
+                    />
+                    <p className="text-[11px] text-violet-600">Wajib diisi bila area ini memiliki kertas kerja.</p>
                   </div>
                 </div>
 
@@ -539,7 +568,7 @@ export function SubmissionsContent({ user, areas, opds, initialSubmissions }: Su
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={() => { setSelectedArea(""); setSelectedDoc(""); setFileUrl(""); setNote(""); setStatus("TERPENUHI"); }}
+                  onClick={() => { setSelectedArea(""); setSelectedDoc(""); setSelectedWorkpaper(""); setFileUrl(""); setWorkpaperUrl(""); setNote(""); setStatus("TERPENUHI"); }}
                 >
                   Reset
                 </Button>
@@ -684,6 +713,16 @@ export function SubmissionsContent({ user, areas, opds, initialSubmissions }: Su
                                           className="text-[11px] text-indigo-600 hover:text-indigo-700 underline font-medium inline-flex items-center mt-0.5"
                                         >
                                           Lihat File ↗
+                                        </a>
+                                      )}
+                                      {s.workpaperUrl && (
+                                        <a
+                                          href={s.workpaperUrl}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="text-[11px] text-violet-600 hover:text-violet-700 underline font-medium inline-flex items-center mt-0.5 ml-3"
+                                        >
+                                          Lihat Kertas Kerja ↗
                                         </a>
                                       )}
                                     </TableCell>

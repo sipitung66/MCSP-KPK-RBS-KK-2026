@@ -9,6 +9,7 @@ import {
   Building2,
   AlertTriangle,
   Users,
+  Tags,
   Upload,
   TrendingUp,
   LogOut,
@@ -39,6 +40,7 @@ const navItemsAdminUtama: NavItem[] = [
   { label: "Rekap Per OPD", href: "/dashboard/opds", icon: Building2 },
   { label: "Early Warning", href: "/dashboard/ews", icon: AlertTriangle },
   { label: "Kelola User OPD", href: "/dashboard/users", icon: Users },
+  { label: "Kelola Tagging OPD", href: "/dashboard/tagging", icon: Tags },
 ];
 
 const navItemsAdminOPD: NavItem[] = [

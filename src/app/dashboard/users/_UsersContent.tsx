@@ -5,6 +5,7 @@ import {
   Users,
   Search,
   UserPlus,
+  Plus,
   Trash2,
   Mail,
   Shield,
@@ -52,7 +53,7 @@ import {
 import { cn } from "@/lib/utils";
 import { toast } from "@/components/ui/use-toast";
 import type { OPDList } from "@prisma/client";
-import { getAllUsers, createUserOPD, deleteUser } from "@/lib/actions/users.actions";
+import { getAllUsers, createUserOPD, createOPD, deleteUser } from "@/lib/actions/users.actions";
 import type { PublicUser } from "@/lib/actions/users.actions";
 
 interface UsersContentProps {
@@ -65,6 +66,7 @@ export function UsersContent({ opds, initialUsers }: UsersContentProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterRole, setFilterRole] = useState<"all" | "ADMIN_UTAMA" | "ADMIN_OPD">("all");
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [opdDialogOpen, setOpdDialogOpen] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [creating, setCreating] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -72,6 +74,8 @@ export function UsersContent({ opds, initialUsers }: UsersContentProps) {
   const [newEmail, setNewEmail] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [newOpd, setNewOpd] = useState("");
+  const [newOpdName, setNewOpdName] = useState("");
+  const [creatingOpd, setCreatingOpd] = useState(false);
 
   const loadData = async () => {
     const data = await getAllUsers();
@@ -103,6 +107,28 @@ export function UsersContent({ opds, initialUsers }: UsersContentProps) {
     setNewPassword("");
     setNewOpd("");
     setShowPassword(false);
+  };
+
+  const handleCreateOPD = async () => {
+    if (!newOpdName.trim()) {
+      toast({ title: "Nama OPD wajib diisi", description: "Masukkan nama OPD baru.", variant: "destructive" });
+      return;
+    }
+    setCreatingOpd(true);
+    try {
+      const result = await createOPD(newOpdName);
+      if (!result.success || !result.opd) {
+        toast({ title: "Gagal menambahkan OPD", description: result.error ?? "Terjadi kesalahan.", variant: "destructive" });
+        return;
+      }
+      setNewOpdName("");
+      setOpdDialogOpen(false);
+      setNewOpd(result.opd.opdName);
+      toast({ title: "OPD berhasil ditambahkan", description: `${result.opd.opdName} siap dibuatkan akun Admin OPD.` });
+      window.location.reload();
+    } finally {
+      setCreatingOpd(false);
+    }
   };
 
   const handleCreate = async () => {
@@ -292,6 +318,32 @@ export function UsersContent({ opds, initialUsers }: UsersContentProps) {
           </Select>
         </div>
 
+        <div className="flex gap-2">
+        <Dialog open={opdDialogOpen} onOpenChange={setOpdDialogOpen}>
+          <DialogTrigger asChild>
+            <Button type="button" variant="outline" className="gap-2">
+              <Plus className="w-4 h-4" />
+              Tambah OPD
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2"><Building2 className="w-5 h-5 text-teal-700" /> Tambah OPD Baru</DialogTitle>
+              <DialogDescription>Tambahkan OPD yang belum tercatat agar dapat dibuatkan akun Admin OPD.</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-2 py-2">
+              <Label className="text-sm font-semibold">Nama OPD <span className="text-rose-500">*</span></Label>
+              <Input value={newOpdName} onChange={(e) => setNewOpdName(e.target.value)} placeholder="Contoh: Dinas Pemuda dan Olahraga" autoFocus />
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => { setOpdDialogOpen(false); setNewOpdName(""); }}>Batal</Button>
+              <Button type="button" onClick={handleCreateOPD} disabled={creatingOpd} className="bg-teal-700 hover:bg-teal-800">
+                {creatingOpd ? <><Loader2 className="w-4 h-4 animate-spin" /> Menyimpan...</> : <><CheckCircle2 className="w-4 h-4" /> Simpan OPD</>}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
             <Button type="button" className="gap-2">
@@ -412,6 +464,7 @@ export function UsersContent({ opds, initialUsers }: UsersContentProps) {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+        </div>
       </div>
 
       <Card className="border-slate-200 shadow-sm overflow-hidden">

@@ -13,6 +13,7 @@ import {
   type WeightedRequirement,
 } from "@/lib/calculations";
 import { getRequiredDocumentsForOPD } from "@/lib/mcsp-rbs";
+import type { OPDTaggingOverrides } from "@/lib/mcsp-rbs";
 import type {
   GlobalSummary,
   AreaProgress,
@@ -95,11 +96,34 @@ function buildWeightedRequirementMapForOPDs(opdList: OPDList[]): Record<string, 
   return map;
 }
 
-function buildAggregatedAreaWeightedRequirements(opdList: OPDList[]): Record<number, WeightedRequirement> {
+function buildTaggingOverrides(profiles: Array<{
+  opdName: string;
+  areaId: number;
+  areaName: string;
+  tags: string[];
+  requiredDocs: string[];
+  workpapers: string[];
+}>): OPDTaggingOverrides {
+  const map: OPDTaggingOverrides = {};
+  for (const profile of profiles) {
+    const current = map[profile.opdName] ?? { tags: profile.tags, requirements: [] };
+    current.tags = profile.tags;
+    current.requirements.push({
+      areaId: profile.areaId,
+      areaName: profile.areaName,
+      requiredDocs: profile.requiredDocs,
+      workpapers: profile.workpapers,
+    });
+    map[profile.opdName] = current;
+  }
+  return map;
+}
+
+function buildAggregatedAreaWeightedRequirements(opdList: OPDList[], overrides?: OPDTaggingOverrides): Record<number, WeightedRequirement> {
   const map: Record<number, { areaId: number; areaName: string; requiredDocs: string[]; workpapers: string[] }> = {};
 
   for (const opd of opdList) {
-    const requirements = getRequiredDocumentsForOPD(opd.opdName);
+    const requirements = getRequiredDocumentsForOPD(opd.opdName, overrides);
     for (const area of requirements) {
       const bucket = map[area.areaId] ?? { areaId: area.areaId, areaName: area.areaName, requiredDocs: [], workpapers: [] };
       for (const doc of area.requiredDocs ?? []) {
@@ -167,7 +191,7 @@ function generateMockDashboardSummary(): DashboardSummary {
 
 export async function getDashboardSummary(): Promise<DashboardSummary> {
   try {
-    const [submissions, areaList, opdList] = await Promise.all([
+    const [submissions, areaList, opdList, tagProfiles] = await Promise.all([
       prisma.submission.findMany({
         select: {
           opdName: true,
@@ -177,11 +201,24 @@ export async function getDashboardSummary(): Promise<DashboardSummary> {
       }),
       prisma.mCSPArea.findMany(),
       prisma.oPDList.findMany(),
+      prisma.oPDTagProfile.findMany({ include: { area: { select: { areaName: true } } } }),
     ]);
 
     const opdCount = opdList.length;
-    const opdRequirementMap = buildWeightedRequirementMapForOPDs(opdList);
-    const areaRequirementMap = buildAggregatedAreaWeightedRequirements(opdList);
+    const taggingOverrides = buildTaggingOverrides(tagProfiles.map((profile) => ({
+      ...profile,
+      areaName: profile.area.areaName,
+    })));
+    const opdRequirementMap = Object.fromEntries(opdList.map((opd) => [
+      opd.opdName,
+      getRequiredDocumentsForOPD(opd.opdName, taggingOverrides).map((area) => ({
+        areaId: area.areaId,
+        areaName: area.areaName,
+        requiredDocs: area.requiredDocs,
+        workpapers: area.workpapers ?? [],
+      })),
+    ]));
+    const areaRequirementMap = buildAggregatedAreaWeightedRequirements(opdList, taggingOverrides);
     const globalSummary = hitungKumulatifGlobal(submissions, areaList, opdCount, opdRequirementMap);
     const progresPerArea = hitungProgresPerArea(submissions, areaList, areaRequirementMap);
     const rasioOPD = hitungRasioOPD(submissions, areaList, opdRequirementMap);
@@ -209,7 +246,7 @@ export async function getDashboardSummaryForOPD(opdName: string): Promise<OPDSpe
   let fetchError = false;
 
   try {
-    const [areasDb, subsDb] = await Promise.all([
+    const [areasDb, subsDb, tagProfiles] = await Promise.all([
       prisma.mCSPArea.findMany(),
       prisma.submission.findMany({
         where: { opdName },
@@ -219,9 +256,34 @@ export async function getDashboardSummaryForOPD(opdName: string): Promise<OPDSpe
           status: true,
         },
       }),
+      prisma.oPDTagProfile.findMany({ where: { opdName }, include: { area: { select: { areaName: true } } } }),
     ]);
     areaList = areasDb;
     submissions = subsDb;
+    const taggingOverrides = buildTaggingOverrides(tagProfiles.map((profile) => ({
+      ...profile,
+      areaName: profile.area.areaName,
+    })));
+    const requirements = getRequiredDocumentsForOPD(opdName, taggingOverrides).map((area) => ({
+      areaId: area.areaId,
+      areaName: area.areaName,
+      requiredDocs: area.requiredDocs,
+      workpapers: area.workpapers ?? [],
+    }));
+    const requirementMap = { [opdName]: requirements };
+    const weighted = calculateWeightedRequirementCompletion(submissions, requirements);
+    const progresPerArea = hitungProgresPerArea(submissions, areaList, Object.fromEntries(requirements.map((item) => [item.areaId, item])));
+    const globalSummary = hitungKumulatifGlobal(submissions, areaList, 1, requirementMap);
+    return {
+      opdName,
+      globalSummary,
+      progresPerArea,
+      statusKepatuhan: getStatusKepatuhan(weighted.percent),
+      rasioTeks: hitungRasioTeks(weighted.completed, weighted.target),
+      totalTerpenuhi: weighted.completed,
+      totalTarget: weighted.target,
+      persentase: weighted.percent,
+    };
   } catch (dbError) {
     console.warn("[dashboard.actions.ts] getDashboardSummaryForOPD DB error, using mock:", dbError instanceof Error ? dbError.message : String(dbError));
     fetchError = true;

@@ -39,6 +39,7 @@ model OPDList {
   // Relasi: Satu OPD bisa memiliki banyak submission dokumen
   submissions  Submission[]
   users        User[]
+  tagProfiles  OPDTagProfile[]
 
   @@map("opd_list")
 }
@@ -54,8 +55,28 @@ model MCSPArea {
 
   // Relasi: Satu area memiliki banyak submission dari berbagai OPD
   submissions Submission[]
+  tagProfiles  OPDTagProfile[]
 
   @@map("mcsp_areas")
+}
+
+// Konfigurasi kewajiban dokumen dan kertas kerja per OPD dan area
+model OPDTagProfile {
+  id           String   @id @default(uuid())
+  opdName      String
+  areaId       Int
+  tags         String[]
+  requiredDocs String[]
+  workpapers   String[]
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  opd          OPDList  @relation(fields: [opdName], references: [opdName], onDelete: Cascade)
+  area         MCSPArea @relation(fields: [areaId], references: [id], onDelete: Cascade)
+
+  @@unique([opdName, areaId])
+  @@index([opdName])
+  @@map("opd_tag_profiles")
 }
 
 // Submission / pengunggahan dokumen bukti dukung per OPD per area
@@ -66,6 +87,7 @@ model Submission {
   documentName String
   status       DocStatus @default(BELUM_TERPENUHI)
   fileUrl      String?
+  workpaperUrl String?
   note         String?
   submittedBy  String?
   createdAt    DateTime @default(now())

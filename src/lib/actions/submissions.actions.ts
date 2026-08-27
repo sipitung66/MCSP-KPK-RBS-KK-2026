@@ -90,6 +90,7 @@ function generateMockSubmissions(): Submission[] {
           documentName: docName,
           status,
           fileUrl: status === "TERPENUHI" ? `https://storage.example.com/files/${opdName}/${areaId}/${docName}.pdf` : null,
+          workpaperUrl: status === "TERPENUHI" ? `https://storage.example.com/workpapers/${opdName}/${areaId}/${docName}.pdf` : null,
           note: status === "TERPENUHI" ? "Dokumen diunggah sesuai jadwal" : "Masih dalam proses penyusunan",
           submittedBy: status === "TERPENUHI" ? `admin.${opdName.split(" ")[0].toLowerCase()}@konawekab.go.id` : null,
           createdAt: now,
@@ -110,7 +111,8 @@ export async function upsertSubmission(
   documentName: string,
   status: DocStatus,
   fileUrl?: string,
-  note?: string
+  note?: string,
+  workpaperUrl?: string
 ): Promise<UpsertSubmissionResult> {
   try {
     const submission = await prisma.submission.upsert({
@@ -124,6 +126,7 @@ export async function upsertSubmission(
       update: {
         status,
         fileUrl: fileUrl ?? undefined,
+        workpaperUrl: workpaperUrl ?? undefined,
         note: note ?? undefined,
       },
       create: {
@@ -132,6 +135,7 @@ export async function upsertSubmission(
         documentName,
         status,
         fileUrl: fileUrl ?? null,
+        workpaperUrl: workpaperUrl ?? null,
         note: note ?? null,
       },
     });
@@ -147,6 +151,7 @@ export async function upsertSubmission(
       documentName,
       status,
       fileUrl: fileUrl ?? null,
+      workpaperUrl: workpaperUrl ?? null,
       note: note ?? null,
       submittedBy: null,
       createdAt: new Date(),

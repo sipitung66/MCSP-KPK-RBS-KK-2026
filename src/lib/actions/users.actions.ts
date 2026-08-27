@@ -2,6 +2,7 @@
 
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
+import { getCurrentUser } from "@/lib/auth";
 import type { User, UserRole } from "@prisma/client";
 
 export interface PublicUser {
@@ -20,6 +21,12 @@ interface CreateUserResult {
 
 interface DeleteUserResult {
   success: boolean;
+  error?: string;
+}
+
+interface CreateOPDResult {
+  success: boolean;
+  opd?: { id: number; opdName: string; createdAt: Date };
   error?: string;
 }
 
@@ -69,6 +76,32 @@ function buildMockUsers(): PublicUser[] {
 
 const GLOBAL_MOCK_USERS = buildMockUsers();
 let mutableMockUsers = [...GLOBAL_MOCK_USERS];
+
+export async function createOPD(opdName: string): Promise<CreateOPDResult> {
+  const user = await getCurrentUser();
+  if (!user || user.role !== "ADMIN_UTAMA") {
+    return { success: false, error: "Hanya Admin Utama yang dapat menambahkan OPD." };
+  }
+
+  const normalizedName = opdName.trim().replace(/\s+/g, " ");
+  if (!normalizedName) return { success: false, error: "Nama OPD wajib diisi." };
+  if (normalizedName.length < 3) return { success: false, error: "Nama OPD terlalu pendek." };
+
+  try {
+    const created = await prisma.oPDList.create({
+      data: { opdName: normalizedName },
+      select: { id: true, opdName: true, createdAt: true },
+    });
+    return { success: true, opd: created };
+  } catch (dbError) {
+    const message = dbError instanceof Error ? dbError.message : String(dbError);
+    if (message.toLowerCase().includes("unique") || message.toLowerCase().includes("duplicate")) {
+      return { success: false, error: "OPD tersebut sudah terdaftar." };
+    }
+    console.warn("[users.actions.ts] createOPD DB error:", message);
+    return { success: false, error: "OPD gagal ditambahkan. Periksa koneksi database." };
+  }
+}
 
 export async function createUserOPD(
   email: string,
