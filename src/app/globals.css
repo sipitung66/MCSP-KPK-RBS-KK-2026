@@ -177,8 +177,11 @@
 
   .login-page { background: #061f3d; }
   .login-hero-photo {
-    background: linear-gradient(180deg, rgba(6, 42, 79, 0.15), rgba(3, 25, 52, 0.3)), linear-gradient(155deg, #092f57 0 28%, #8e1f3f 28% 52%, #f0f1ed 52% 68%, #0b3560 68%);
-    filter: saturate(0.88);
+    background-image: url("/logos/publiclogin-background.jpg");
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    filter: saturate(0.92);
   }
   .logo-kpk, .logo-kemenag {
     display: flex; align-items: center; justify-content: center; width: 38px; height: 42px;

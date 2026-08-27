@@ -41,13 +41,13 @@ export default function LoginPage() {
   return (
     <main className="login-page min-h-screen w-full overflow-hidden bg-[#061f3d] text-slate-900">
       <div className="login-layout mx-auto grid min-h-screen w-full max-w-[1440px] lg:grid-cols-[1.08fr_0.92fr]">
-        <section className="login-hero relative hidden min-h-screen overflow-hidden lg:flex lg:flex-col lg:justify-end lg:p-16">
+        <section className="login-hero relative hidden min-h-screen overflow-hidden lg:flex lg:flex-col lg:justify-end lg:px-16 lg:pb-10 lg:pt-16">
           <div className="login-hero-photo absolute inset-0" aria-hidden="true" />
           <div className="absolute inset-0 bg-gradient-to-t from-[#031a35] via-[#062750]/20 to-[#041d3c]/20" />
-          <div className="relative z-10 max-w-[640px] pb-8 text-white">
-            <p className="mb-4 text-sm font-semibold tracking-[0.18em] text-white/80 uppercase">Inspektorat Kabupaten Konawe</p>
-            <h1 className="max-w-[590px] text-4xl font-bold leading-[1.14] tracking-tight xl:text-[42px]">&quot;Korupsi Menghancurkan Tatanan Bangsa. Pemerintah Kabupaten Konawe Berkomitmen Penuh: Tolak, Cegah, dan Lawan Korupsi demi Konawe yang Berintegritas!&quot;</h1>
-            <div className="mt-5 h-1 w-16 bg-[#ffd500]" />
+          <div className="relative z-10 max-w-[520px] pb-2 text-white">
+            <p className="mb-2 text-[10px] font-semibold tracking-[0.14em] text-white/80 uppercase">Inspektorat Kabupaten Konawe</p>
+            <h1 className="max-w-[500px] text-base font-semibold leading-[1.35] tracking-normal text-white/95 xl:text-lg">&quot;Korupsi Menghancurkan Tatanan Bangsa. Pemerintah Kabupaten Konawe Berkomitmen Penuh: Tolak, Cegah, dan Lawan Korupsi demi Konawe yang Berintegritas!&quot;</h1>
+            <div className="mt-3 h-0.5 w-10 bg-[#ffd500]" />
           </div>
         </section>
 
