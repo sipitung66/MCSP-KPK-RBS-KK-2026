@@ -40,6 +40,12 @@ import {
 import { toast } from "@/components/ui/use-toast";
 import { cn } from "@/lib/utils";
 import { getSubmissionsByOPD, upsertSubmission } from "@/lib/actions/submissions.actions";
+import {
+  getAreaRequiredDocumentNames,
+  getAreaRequiredWorkpapers,
+  getOPDComplianceSnapshot,
+  getRequiredDocumentsForOPD,
+} from "@/lib/mcsp-rbs";
 import type { MCSPArea, OPDList, Submission, DocStatus } from "@prisma/client";
 
 interface ClientUser {
@@ -88,8 +94,19 @@ export function SubmissionsContent({ user, areas, opds, initialSubmissions }: Su
     user.role === "ADMIN_UTAMA"
       ? filterOPD !== "all"
         ? filterOPD
-        : undefined
+        : opds[0]?.opdName
       : user.opdName ?? undefined;
+
+  const opdComplianceSnapshot =
+    currentOpdName ? getOPDComplianceSnapshot(currentOpdName, submissions) : null;
+
+  const requiredDocumentGroups = currentOpdName
+    ? getRequiredDocumentsForOPD(currentOpdName)
+    : [];
+
+  const selectedAreaRequirement = selectedArea
+    ? requiredDocumentGroups.find((group) => group.areaId === Number(selectedArea))
+    : undefined;
 
   const refreshSubmissions = async () => {
     const subs = await getSubmissionsByOPD(currentOpdName);
@@ -185,10 +202,195 @@ export function SubmissionsContent({ user, areas, opds, initialSubmissions }: Su
     return true;
   });
 
-  const documentListForSelectedArea = selectedArea ? AREA_DOCUMENTS[Number(selectedArea)] ?? [] : [];
+  const documentListForSelectedArea = selectedArea
+    ? getAreaRequiredDocumentNames(
+        currentOpdName ?? user.opdName ?? opds[0]?.opdName ?? "",
+        Number(selectedArea)
+      )
+    : [];
+
+  const workpaperListForSelectedArea = selectedArea
+    ? getAreaRequiredWorkpapers(
+        currentOpdName ?? user.opdName ?? opds[0]?.opdName ?? "",
+        Number(selectedArea)
+      )
+    : [];
 
   return (
     <div className="space-y-6">
+      {currentOpdName && opdComplianceSnapshot && (
+        <Card className="border-slate-200 shadow-sm overflow-hidden">
+          <CardContent className="p-5 sm:p-6">
+            <div className="flex flex-col xl:flex-row xl:items-start xl:justify-between gap-5">
+              <div className="space-y-4">
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Tagging OPD</p>
+                  <h3 className="mt-2 text-xl font-bold text-slate-800">{currentOpdName}</h3>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {opdComplianceSnapshot.tags.map((tag) => (
+                    <Badge key={tag} variant="secondary" className="bg-slate-100 text-slate-700">
+                      {tag}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 min-w-[320px] xl:min-w-[520px]">
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                  <p className="text-[10px] uppercase tracking-[0.16em] text-slate-500">Dokumen Wajib</p>
+                  <p className="mt-2 text-2xl font-black text-slate-800">{opdComplianceSnapshot.requiredDocs}</p>
+                </div>
+                <div className="rounded-xl border border-violet-200 bg-violet-50 p-3">
+                  <p className="text-[10px] uppercase tracking-[0.16em] text-violet-700">Kertas Kerja</p>
+                  <p className="mt-2 text-2xl font-black text-violet-700">{opdComplianceSnapshot.requiredWorkpapers}</p>
+                </div>
+                <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3">
+                  <p className="text-[10px] uppercase tracking-[0.16em] text-emerald-700">Terpenuhi</p>
+                  <p className="mt-2 text-2xl font-black text-emerald-700">{opdComplianceSnapshot.completedDocs + opdComplianceSnapshot.completedWorkpapers}</p>
+                </div>
+                <div className="rounded-xl border border-amber-200 bg-amber-50 p-3">
+                  <p className="text-[10px] uppercase tracking-[0.16em] text-amber-700">Kelengkapan</p>
+                  <p className="mt-2 text-2xl font-black text-amber-700">{opdComplianceSnapshot.percent}%</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-5 grid grid-cols-1 xl:grid-cols-[1.3fr_0.7fr] gap-5">
+              <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
+                <p className="text-sm font-bold text-slate-700">Daftar Dokumen dan Kertas Kerja Wajib</p>
+                <div className="mt-3 space-y-3">
+                  {requiredDocumentGroups.map((group) => (
+                    <div key={group.areaId} className="rounded-lg border border-slate-200 bg-white p-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="text-sm font-semibold text-slate-800">{group.areaName}</p>
+                        <Badge variant="outline" className="text-[10px] font-semibold">
+                          {group.requiredDocs.length + (group.workpapers?.length ?? 0)} item
+                        </Badge>
+                      </div>
+
+                      <div className="mt-3">
+                        <p className="text-[10px] uppercase tracking-[0.12em] font-bold text-slate-500">Dokumen</p>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          {group.requiredDocs.map((doc) => (
+                            <Badge
+                              key={`${group.areaId}-${doc}`}
+                              variant={
+                                submissions.some(
+                                  (submission) =>
+                                    submission.areaId === group.areaId &&
+                                    submission.documentName === doc &&
+                                    submission.status === "TERPENUHI"
+                                )
+                                  ? "success"
+                                  : "secondary"
+                              }
+                              className={cn(
+                                "text-[10px] px-2 py-1",
+                                submissions.some(
+                                  (submission) =>
+                                    submission.areaId === group.areaId &&
+                                    submission.documentName === doc &&
+                                    submission.status === "TERPENUHI"
+                                )
+                                  ? "bg-emerald-100 text-emerald-800"
+                                  : "bg-slate-100 text-slate-700"
+                              )}
+                            >
+                              {doc}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+
+                      {(group.workpapers ?? []).length > 0 && (
+                        <div className="mt-3">
+                          <p className="text-[10px] uppercase tracking-[0.12em] font-bold text-violet-600">Kertas Kerja</p>
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            {(group.workpapers ?? []).map((paper) => (
+                              <Badge
+                                key={`${group.areaId}-paper-${paper}`}
+                                variant={
+                                  submissions.some(
+                                    (submission) =>
+                                      submission.areaId === group.areaId &&
+                                      submission.status === "TERPENUHI" &&
+                                      (
+                                        submission.documentName === paper ||
+                                        submission.documentName.toLowerCase().includes(paper.toLowerCase()) ||
+                                        paper.toLowerCase().includes(submission.documentName.toLowerCase())
+                                      )
+                                  )
+                                    ? "success"
+                                    : "secondary"
+                                }
+                                className={cn(
+                                  "text-[10px] px-2 py-1",
+                                  submissions.some(
+                                    (submission) =>
+                                      submission.areaId === group.areaId &&
+                                      submission.status === "TERPENUHI" &&
+                                      (
+                                        submission.documentName === paper ||
+                                        submission.documentName.toLowerCase().includes(paper.toLowerCase()) ||
+                                        paper.toLowerCase().includes(submission.documentName.toLowerCase())
+                                      )
+                                  )
+                                    ? "bg-violet-100 text-violet-800"
+                                    : "bg-slate-100 text-slate-700"
+                                )}
+                              >
+                                {paper}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <div className="rounded-xl border border-rose-200 bg-rose-50 p-4">
+                  <p className="text-sm font-bold text-rose-700">Dokumen yang masih belum lengkap</p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {opdComplianceSnapshot.missingDocs.length === 0 ? (
+                      <Badge variant="success" className="bg-emerald-100 text-emerald-800">
+                        Semua dokumen wajib sudah terpenuhi
+                      </Badge>
+                    ) : (
+                      opdComplianceSnapshot.missingDocs.slice(0, 12).map((doc) => (
+                        <Badge key={doc} variant="secondary" className="bg-white text-rose-700 border border-rose-200">
+                          {doc}
+                        </Badge>
+                      ))
+                    )}
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-violet-200 bg-violet-50 p-4">
+                  <p className="text-sm font-bold text-violet-700">Kertas kerja yang belum lengkap</p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {opdComplianceSnapshot.missingWorkpapers.length === 0 ? (
+                      <Badge variant="success" className="bg-emerald-100 text-emerald-800">
+                        Semua kertas kerja wajib sudah ada
+                      </Badge>
+                    ) : (
+                      opdComplianceSnapshot.missingWorkpapers.slice(0, 12).map((paper) => (
+                        <Badge key={paper} variant="secondary" className="bg-white text-violet-700 border border-violet-200">
+                          {paper}
+                        </Badge>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {user.role === "ADMIN_UTAMA" && (
         <Card className="border-slate-200">
           <CardContent className="p-5">
@@ -289,6 +491,40 @@ export function SubmissionsContent({ user, areas, opds, initialSubmissions }: Su
                     />
                   </div>
                 </div>
+
+                {selectedArea && selectedAreaRequirement && (
+                  <div className="rounded-xl border border-violet-200 bg-violet-50/70 p-4">
+                    <p className="text-xs font-bold uppercase tracking-[0.14em] text-violet-700">Kriteria wajib untuk area ini</p>
+                    <div className="mt-3 grid grid-cols-1 xl:grid-cols-2 gap-3">
+                      <div>
+                        <p className="text-[10px] uppercase tracking-[0.12em] text-slate-500 mb-2">Dokumen</p>
+                        <div className="flex flex-wrap gap-2">
+                          {selectedAreaRequirement.requiredDocs.map((doc) => (
+                            <Badge key={doc} variant="secondary" className="bg-white text-slate-700 border border-slate-200">
+                              {doc}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                      <div>
+                        <p className="text-[10px] uppercase tracking-[0.12em] text-violet-700 mb-2">Kertas Kerja</p>
+                        <div className="flex flex-wrap gap-2">
+                          {(selectedAreaRequirement.workpapers ?? workpaperListForSelectedArea).length === 0 ? (
+                            <Badge variant="secondary" className="bg-white text-slate-500 border border-slate-200">
+                              Tidak ada kertas kerja khusus
+                            </Badge>
+                          ) : (
+                            (selectedAreaRequirement.workpapers ?? workpaperListForSelectedArea).map((paper) => (
+                              <Badge key={paper} variant="secondary" className="bg-violet-100 text-violet-800 border border-violet-200">
+                                {paper}
+                              </Badge>
+                            ))
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
                 <div className="space-y-2">
                   <Label className="text-sm font-semibold">Catatan Tambahan</Label>
                   <Textarea

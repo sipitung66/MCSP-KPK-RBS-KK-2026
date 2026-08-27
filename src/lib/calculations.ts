@@ -8,6 +8,13 @@ export interface AreaProgress {
   persentase: number;
 }
 
+export interface WeightedRequirement {
+  areaId: number;
+  areaName: string;
+  requiredDocs?: string[];
+  workpapers?: string[];
+}
+
 export interface OPDProgress {
   opdName: string;
   terpenuhi: number;
@@ -45,6 +52,7 @@ export interface EWSResult {
 interface BaseSubmission {
   opdName: string;
   areaId: number;
+  documentName?: string;
   status: "TERPENUHI" | "BELUM_TERPENUHI";
 }
 
@@ -62,6 +70,56 @@ export function hitungPersentase(terpenuhi: number, target: number): number {
   return Math.round(pct * 100) / 100;
 }
 
+export function normalizeRequirementName(value: string): string {
+  return value.trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+export function calculateWeightedRequirementCompletion(
+  submissions: BaseSubmission[],
+  requirements: WeightedRequirement[]
+): { target: number; completed: number; percent: number } {
+  let weightedTarget = 0;
+  let weightedCompleted = 0;
+
+  for (const requirement of requirements) {
+    const docs = requirement.requiredDocs ?? [];
+    const workpapers = requirement.workpapers ?? [];
+
+    const targetForArea = docs.length + workpapers.length * 0.5;
+    weightedTarget += targetForArea;
+
+    const completedDocs = docs.filter((docName) =>
+      submissions.some(
+        (submission) =>
+          submission.areaId === requirement.areaId &&
+          normalizeRequirementName(submission.documentName ?? "") === normalizeRequirementName(docName) &&
+          submission.status === "TERPENUHI"
+      )
+    ).length;
+
+    const completedWorkpapers = workpapers.filter((workpaperName) =>
+      submissions.some(
+        (submission) =>
+          submission.areaId === requirement.areaId &&
+          submission.status === "TERPENUHI" &&
+          (
+            normalizeRequirementName(submission.documentName ?? "") === normalizeRequirementName(workpaperName) ||
+            normalizeRequirementName(submission.documentName ?? "").includes(normalizeRequirementName(workpaperName)) ||
+            normalizeRequirementName(workpaperName).includes(normalizeRequirementName(submission.documentName ?? ""))
+          )
+      )
+    ).length;
+
+    weightedCompleted += completedDocs + completedWorkpapers * 0.5;
+  }
+
+  return {
+    target: weightedTarget,
+    completed: weightedCompleted,
+    percent: hitungPersentase(weightedCompleted, weightedTarget),
+  };
+}
+
 export function getStatusKepatuhan(persentase: number): ComplianceStatus {
   if (persentase >= 80) return "Optimal";
   if (persentase >= 40) return "Dalam Proses";
@@ -74,7 +132,8 @@ export function hitungRasioTeks(terpenuhi: number, target: number): string {
 
 export function hitungProgresPerArea(
   submissions: BaseSubmission[],
-  areas: BaseMCSPArea[]
+  areas: BaseMCSPArea[],
+  requirementMap?: Record<number, WeightedRequirement>
 ): AreaProgress[] {
   const terpenuhiPerArea = new Map<number, number>();
 
@@ -86,13 +145,48 @@ export function hitungProgresPerArea(
   }
 
   return areas.map((area) => {
-    const terpenuhi = terpenuhiPerArea.get(area.id) ?? 0;
-    const persentase = hitungPersentase(terpenuhi, area.targetDocs);
+    const requirement = requirementMap?.[area.id];
+    const docs = requirement?.requiredDocs ?? [];
+    const workpapers = requirement?.workpapers ?? [];
+    const weightedTarget = docs.length + workpapers.length * 0.5;
+    const areaSubmissionCount = submissions.filter((s) => s.areaId === area.id && s.status === "TERPENUHI").length;
+    const target = requirement ? weightedTarget : area.targetDocs;
+
+    let weightedCompleted = 0;
+    if (requirement) {
+      const completedDocs = docs.filter((docName) =>
+        submissions.some(
+          (submission) =>
+            submission.areaId === area.id &&
+            normalizeRequirementName(submission.documentName ?? "") === normalizeRequirementName(docName) &&
+            submission.status === "TERPENUHI"
+        )
+      ).length;
+
+      const completedWorkpapers = workpapers.filter((workpaperName) =>
+        submissions.some(
+          (submission) =>
+            submission.areaId === area.id &&
+            submission.status === "TERPENUHI" &&
+            (
+              normalizeRequirementName(submission.documentName ?? "") === normalizeRequirementName(workpaperName) ||
+              normalizeRequirementName(submission.documentName ?? "").includes(normalizeRequirementName(workpaperName)) ||
+              normalizeRequirementName(workpaperName).includes(normalizeRequirementName(submission.documentName ?? ""))
+            )
+        )
+      ).length;
+
+      weightedCompleted = completedDocs + completedWorkpapers * 0.5;
+    } else {
+      weightedCompleted = terpenuhiPerArea.get(area.id) ?? 0;
+    }
+
+    const persentase = hitungPersentase(weightedCompleted, target || 0);
     return {
       areaId: area.id,
       areaName: area.areaName,
-      terpenuhi,
-      target: area.targetDocs,
+      terpenuhi: weightedCompleted,
+      target,
       persentase,
     };
   });
@@ -100,7 +194,8 @@ export function hitungProgresPerArea(
 
 export function hitungRasioOPD(
   submissions: BaseSubmission[],
-  areas: BaseMCSPArea[]
+  areas: BaseMCSPArea[],
+  requirementMap?: Record<string, WeightedRequirement[]>
 ): OPDProgress[] {
   const opdMap = new Map<
     string,
@@ -122,13 +217,19 @@ export function hitungRasioOPD(
 
   const result: OPDProgress[] = [];
   for (const [opdName, data] of opdMap.entries()) {
-    const persentase = hitungPersentase(data.terpenuhi, totalTargetPerOPD);
+    const requirements = requirementMap?.[opdName] ?? [];
+    const weighted = requirements.length > 0 ? calculateWeightedRequirementCompletion(submissions.filter((s) => s.opdName === opdName), requirements) : {
+      target: totalTargetPerOPD,
+      completed: data.terpenuhi,
+      percent: hitungPersentase(data.terpenuhi, totalTargetPerOPD),
+    };
+
     result.push({
       opdName,
-      terpenuhi: data.terpenuhi,
-      target: totalTargetPerOPD,
-      persentase,
-      status: getStatusKepatuhan(persentase),
+      terpenuhi: weighted.completed,
+      target: weighted.target,
+      persentase: weighted.percent,
+      status: getStatusKepatuhan(weighted.percent),
     });
   }
 
@@ -139,8 +240,32 @@ export function hitungRasioOPD(
 export function hitungKumulatifGlobal(
   submissions: BaseSubmission[],
   areas: BaseMCSPArea[],
-  opdCount: number
+  opdCount: number,
+  opdRequirementMap?: Record<string, WeightedRequirement[]>
 ): GlobalSummary {
+  if (opdRequirementMap && Object.keys(opdRequirementMap).length > 0) {
+    let totalTarget = 0;
+    let totalTerpenuhi = 0;
+
+    for (const opdName of Object.keys(opdRequirementMap)) {
+      const weighted = calculateWeightedRequirementCompletion(
+        submissions.filter((s) => s.opdName === opdName),
+        opdRequirementMap[opdName]
+      );
+      totalTarget += weighted.target;
+      totalTerpenuhi += weighted.completed;
+    }
+
+    const persentase = hitungPersentase(totalTerpenuhi, totalTarget);
+    return {
+      totalTarget,
+      totalTerpenuhi,
+      persentase,
+      ratioText: hitungRasioTeks(Number(totalTerpenuhi.toFixed(0)), totalTarget),
+      status: getStatusKepatuhan(persentase),
+    };
+  }
+
   const totalTarget =
     areas.reduce((sum, a) => sum + a.targetDocs, 0) * Math.max(opdCount, 1);
   const totalTerpenuhi = submissions.filter(

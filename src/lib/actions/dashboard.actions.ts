@@ -9,7 +9,10 @@ import {
   getStatusKepatuhan,
   hitungPersentase,
   hitungRasioTeks,
+  calculateWeightedRequirementCompletion,
+  type WeightedRequirement,
 } from "@/lib/calculations";
+import { getRequiredDocumentsForOPD } from "@/lib/mcsp-rbs";
 import type {
   GlobalSummary,
   AreaProgress,
@@ -72,7 +75,46 @@ const MOCK_OPD_LIST: OPDList[] = [
 interface BaseSubmissionLite {
   opdName: string;
   areaId: number;
+  documentName?: string;
   status: "TERPENUHI" | "BELUM_TERPENUHI";
+}
+
+function buildWeightedRequirementMapForOPDs(opdList: OPDList[]): Record<string, WeightedRequirement[]> {
+  const map: Record<string, WeightedRequirement[]> = {};
+
+  for (const opd of opdList) {
+    const requirements = getRequiredDocumentsForOPD(opd.opdName);
+    map[opd.opdName] = requirements.map((area) => ({
+      areaId: area.areaId,
+      areaName: area.areaName,
+      requiredDocs: area.requiredDocs,
+      workpapers: area.workpapers ?? [],
+    }));
+  }
+
+  return map;
+}
+
+function buildAggregatedAreaWeightedRequirements(opdList: OPDList[]): Record<number, WeightedRequirement> {
+  const map: Record<number, { areaId: number; areaName: string; requiredDocs: string[]; workpapers: string[] }> = {};
+
+  for (const opd of opdList) {
+    const requirements = getRequiredDocumentsForOPD(opd.opdName);
+    for (const area of requirements) {
+      const bucket = map[area.areaId] ?? { areaId: area.areaId, areaName: area.areaName, requiredDocs: [], workpapers: [] };
+      for (const doc of area.requiredDocs ?? []) {
+        if (!bucket.requiredDocs.includes(doc)) bucket.requiredDocs.push(doc);
+      }
+      for (const paper of area.workpapers ?? []) {
+        if (!bucket.workpapers.includes(paper)) bucket.workpapers.push(paper);
+      }
+      map[area.areaId] = bucket;
+    }
+  }
+
+  return Object.fromEntries(
+    Object.values(map).map((area) => [area.areaId, { areaId: area.areaId, areaName: area.areaName, requiredDocs: area.requiredDocs, workpapers: area.workpapers }])
+  );
 }
 
 function generateMockSubmissionsLite(): BaseSubmissionLite[] {
@@ -103,10 +145,12 @@ function generateMockDashboardSummary(): DashboardSummary {
   const areaList = MOCK_AREAS;
   const submissions = GLOBAL_MOCK_SUBMISSIONS_LITE;
   const opdCount = opdList.length;
+  const opdRequirementMap = buildWeightedRequirementMapForOPDs(opdList);
+  const areaRequirementMap = buildAggregatedAreaWeightedRequirements(opdList);
 
-  const globalSummary = hitungKumulatifGlobal(submissions, areaList, opdCount);
-  const progresPerArea = hitungProgresPerArea(submissions, areaList);
-  const rasioOPD = hitungRasioOPD(submissions, areaList);
+  const globalSummary = hitungKumulatifGlobal(submissions, areaList, opdCount, opdRequirementMap);
+  const progresPerArea = hitungProgresPerArea(submissions, areaList, areaRequirementMap);
+  const rasioOPD = hitungRasioOPD(submissions, areaList, opdRequirementMap);
   const ews = generateEWS(rasioOPD, progresPerArea);
 
   return {
@@ -136,9 +180,11 @@ export async function getDashboardSummary(): Promise<DashboardSummary> {
     ]);
 
     const opdCount = opdList.length;
-    const globalSummary = hitungKumulatifGlobal(submissions, areaList, opdCount);
-    const progresPerArea = hitungProgresPerArea(submissions, areaList);
-    const rasioOPD = hitungRasioOPD(submissions, areaList);
+    const opdRequirementMap = buildWeightedRequirementMapForOPDs(opdList);
+    const areaRequirementMap = buildAggregatedAreaWeightedRequirements(opdList);
+    const globalSummary = hitungKumulatifGlobal(submissions, areaList, opdCount, opdRequirementMap);
+    const progresPerArea = hitungProgresPerArea(submissions, areaList, areaRequirementMap);
+    const rasioOPD = hitungRasioOPD(submissions, areaList, opdRequirementMap);
     const ews = generateEWS(rasioOPD, progresPerArea);
 
     return {
@@ -198,16 +244,26 @@ export async function getDashboardSummaryForOPD(opdName: string): Promise<OPDSpe
     }
   }
 
-  const totalTarget = areaList.reduce((sum, a) => sum + a.targetDocs, 0);
-  const totalTerpenuhi = submissions.filter((s) => s.status === "TERPENUHI").length;
-  const persentase = hitungPersentase(totalTerpenuhi, totalTarget);
+  const requirementMap = buildWeightedRequirementMapForOPDs([{ id: 1, opdName, createdAt: new Date() }]);
+  const weighted = requirementMap[opdName]?.length
+    ? calculateWeightedRequirementCompletion(submissions, requirementMap[opdName])
+    : {
+        target: areaList.reduce((sum, a) => sum + a.targetDocs, 0),
+        completed: submissions.filter((s) => s.status === "TERPENUHI").length,
+        percent: hitungPersentase(submissions.filter((s) => s.status === "TERPENUHI").length, areaList.reduce((sum, a) => sum + a.targetDocs, 0)),
+      };
+
+  const totalTarget = weighted.target;
+  const totalTerpenuhi = weighted.completed;
+  const persentase = weighted.percent;
   const statusKepatuhan = getStatusKepatuhan(persentase);
   const rasioTeks = hitungRasioTeks(totalTerpenuhi, totalTarget);
 
   const singleOPDSubmissions = submissions;
-  const progresPerArea = hitungProgresPerArea(singleOPDSubmissions, areaList);
+  const areaRequirementMap = buildAggregatedAreaWeightedRequirements([{ id: 1, opdName, createdAt: new Date() }]);
+  const progresPerArea = hitungProgresPerArea(singleOPDSubmissions, areaList, areaRequirementMap);
 
-  const globalSummary = hitungKumulatifGlobal(singleOPDSubmissions, areaList, 1);
+  const globalSummary = hitungKumulatifGlobal(singleOPDSubmissions, areaList, 1, requirementMap);
 
   return {
     opdName,
