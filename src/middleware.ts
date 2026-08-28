@@ -23,15 +23,7 @@ async function verifyToken(token: string): Promise<SessionPayload | null> {
     const { payload } = await jwtVerify(token, secret);
     return payload as SessionPayload;
   } catch {
-    try {
-      const parts = token.split(".");
-      if (parts.length !== 3) return null;
-      const payloadStr = Buffer.from(parts[1], "base64").toString("utf-8");
-      const payload = JSON.parse(payloadStr);
-      return payload as SessionPayload;
-    } catch {
-      return null;
-    }
+    return null;
   }
 }
 

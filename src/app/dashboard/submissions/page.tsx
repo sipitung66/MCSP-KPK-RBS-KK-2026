@@ -24,6 +24,7 @@ export default async function SubmissionsPage() {
   for (const profile of taggingProfiles) {
     const current = taggingOverrides[profile.opdName] ?? { tags: profile.tags, requirements: [] };
     current.tags = profile.tags;
+    current.hierarchy = { ...(current.hierarchy ?? {}), ...(profile.hierarchy ?? {}) };
     current.requirements.push({
       areaId: profile.areaId,
       areaName: profile.areaName,

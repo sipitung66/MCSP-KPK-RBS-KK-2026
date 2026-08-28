@@ -56,8 +56,31 @@ model MCSPArea {
   // Relasi: Satu area memiliki banyak submission dari berbagai OPD
   submissions Submission[]
   tagProfiles  OPDTagProfile[]
+  indicators   MCSPIndicator[]
 
   @@map("mcsp_areas")
+}
+
+model MCSPIndicator {
+  id             String   @id
+  areaId         Int
+  indicatorNo    Int
+  objective      String
+  indicatorName  String
+  responsible    String
+  documentCount  Int
+  scoringMethod  String
+  maxScore      Float    @default(100)
+  assessmentYear Int     @default(2026)
+  sourceSystem   String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  area MCSPArea @relation(fields: [areaId], references: [id], onDelete: Cascade)
+
+  @@unique([areaId, indicatorNo, assessmentYear])
+  @@index([areaId])
+  @@map("mcsp_indicators")
 }
 
 // Konfigurasi kewajiban dokumen dan kertas kerja per OPD dan area
@@ -68,13 +91,17 @@ model OPDTagProfile {
   tags         String[]
   requiredDocs String[]
   workpapers   String[]
+  hierarchy    Json?
+  assessmentYear Int      @default(2026)
+  period         String   @default("TAHUNAN")
+  updatedBy      String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
   opd          OPDList  @relation(fields: [opdName], references: [opdName], onDelete: Cascade)
   area         MCSPArea @relation(fields: [areaId], references: [id], onDelete: Cascade)
 
-  @@unique([opdName, areaId])
+  @@unique([opdName, areaId, assessmentYear, period])
   @@index([opdName])
   @@map("opd_tag_profiles")
 }
@@ -90,11 +117,17 @@ model Submission {
   workpaperUrl String?
   note         String?
   submittedBy  String?
+  assessmentYear Int              @default(2026)
+  period         String           @default("TAHUNAN")
+  verificationStatus VerificationStatus @default(BELUM_DIVERIFIKASI)
+  verifiedBy    String?
+  verifiedAt    DateTime?
+  verificationNote String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
   // Composite unique constraint: Satu OPD, Satu Area, Satu Nama Dokumen hanya boleh 1 record
-  @@unique([opdName, areaId, documentName])
+  @@unique([opdName, areaId, documentName, assessmentYear, period])
 
   // Relasi
   opd          OPDList  @relation(fields: [opdName], references: [opdName], onDelete: Cascade)
@@ -106,4 +139,27 @@ model Submission {
 enum DocStatus {
   TERPENUHI
   BELUM_TERPENUHI
+}
+
+enum VerificationStatus {
+  BELUM_DIVERIFIKASI
+  DIVERIFIKASI
+  PERLU_REVISI
+  DITOLAK
+}
+
+model AuditLog {
+  id           String   @id @default(uuid())
+  entityType   String
+  entityId     String
+  action       String
+  actorId      String?
+  beforeData   Json?
+  afterData    Json?
+  reason       String?
+  createdAt    DateTime @default(now())
+
+  @@index([entityType, entityId])
+  @@index([createdAt])
+  @@map("audit_logs")
 }

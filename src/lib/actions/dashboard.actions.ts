@@ -12,7 +12,7 @@ import {
   calculateWeightedRequirementCompletion,
   type WeightedRequirement,
 } from "@/lib/calculations";
-import { getRequiredDocumentsForOPD } from "@/lib/mcsp-rbs";
+import { getRequiredDocumentsForOPD, type TaggingHierarchy } from "@/lib/mcsp-rbs";
 import type { OPDTaggingOverrides } from "@/lib/mcsp-rbs";
 import type {
   GlobalSummary,
@@ -47,12 +47,12 @@ export interface OPDSpecificSummary {
 
 const MOCK_AREAS: MCSPArea[] = [
   { id: 1, areaName: "Perencanaan Strategis", targetDocs: 25, description: "Area strategis perencanaan", createdAt: new Date() },
-  { id: 2, areaName: "Pengelolaan Keuangan", targetDocs: 6, description: "Area pengelolaan keuangan daerah", createdAt: new Date() },
-  { id: 3, areaName: "Pengadaan Barang/Jasa", targetDocs: 30, description: "Area pengadaan barang dan jasa pemerintah", createdAt: new Date() },
+  { id: 2, areaName: "Pengadaan Barang dan Jasa (PBJ)", targetDocs: 13, description: "Area pengadaan barang dan jasa pemerintah", createdAt: new Date() },
+  { id: 3, areaName: "Pelayanan Publik", targetDocs: 30, description: "Area pelayanan publik kepada masyarakat", createdAt: new Date() },
   { id: 4, areaName: "Manajemen Sumber Daya Manusia", targetDocs: 20, description: "Area kepegawaian dan SDM aparatur", createdAt: new Date() },
-  { id: 5, areaName: "Pelayanan Publik", targetDocs: 35, description: "Area pelayanan publik kepada masyarakat", createdAt: new Date() },
-  { id: 6, areaName: "Pengelolaan Aset Daerah", targetDocs: 16, description: "Area pengelolaan aset milik daerah", createdAt: new Date() },
-  { id: 7, areaName: "Pengawasan Internal", targetDocs: 6, description: "Area pengawasan internal pemerintahan", createdAt: new Date() },
+  { id: 5, areaName: "Pengelolaan Barang Milik Daerah (BMD)", targetDocs: 35, description: "Area pengelolaan aset milik daerah", createdAt: new Date() },
+  { id: 6, areaName: "Optimalisasi Pendapatan Daerah", targetDocs: 16, description: "Area optimalisasi pendapatan daerah", createdAt: new Date() },
+  { id: 7, areaName: "Penguatan APIP", targetDocs: 23, description: "Area penguatan APIP", createdAt: new Date() },
 ];
 
 const MOCK_OPD_LIST: OPDList[] = [
@@ -78,6 +78,7 @@ interface BaseSubmissionLite {
   areaId: number;
   documentName?: string;
   status: "TERPENUHI" | "BELUM_TERPENUHI";
+  verificationStatus?: "BELUM_DIVERIFIKASI" | "DIVERIFIKASI" | "PERLU_REVISI" | "DITOLAK";
 }
 
 function buildWeightedRequirementMapForOPDs(opdList: OPDList[]): Record<string, WeightedRequirement[]> {
@@ -103,11 +104,16 @@ function buildTaggingOverrides(profiles: Array<{
   tags: string[];
   requiredDocs: string[];
   workpapers: string[];
+  hierarchy: unknown;
 }>): OPDTaggingOverrides {
   const map: OPDTaggingOverrides = {};
   for (const profile of profiles) {
     const current = map[profile.opdName] ?? { tags: profile.tags, requirements: [] };
     current.tags = profile.tags;
+    current.hierarchy = {
+      ...(current.hierarchy ?? {}),
+      ...(profile.hierarchy as Record<number, TaggingHierarchy> | null | undefined ?? {}),
+    };
     current.requirements.push({
       areaId: profile.areaId,
       areaName: profile.areaName,
@@ -197,6 +203,7 @@ export async function getDashboardSummary(): Promise<DashboardSummary> {
           opdName: true,
           areaId: true,
           status: true,
+          verificationStatus: true,
         },
       }),
       prisma.mCSPArea.findMany(),
@@ -254,6 +261,7 @@ export async function getDashboardSummaryForOPD(opdName: string): Promise<OPDSpe
           opdName: true,
           areaId: true,
           status: true,
+          verificationStatus: true,
         },
       }),
       prisma.oPDTagProfile.findMany({ where: { opdName }, include: { area: { select: { areaName: true } } } }),

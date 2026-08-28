@@ -13,6 +13,7 @@ import {
   ChevronDown,
   ChevronUp,
   Loader2,
+  ShieldCheck,
 } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
@@ -39,15 +40,17 @@ import {
 } from "@/components/ui/table";
 import { toast } from "@/components/ui/use-toast";
 import { cn } from "@/lib/utils";
-import { getSubmissionsByOPD, upsertSubmission } from "@/lib/actions/submissions.actions";
+import { getSubmissionsByOPD, upsertSubmission, verifySubmission } from "@/lib/actions/submissions.actions";
+import { formatMCSPFileLabel, formatMCSPHierarchyLabel } from "@/lib/mcsp-workpapers";
 import {
   getAreaRequiredDocumentNames,
   getAreaRequiredWorkpapers,
+  getAreaHierarchy,
   getOPDComplianceSnapshot,
   getRequiredDocumentsForOPD,
 } from "@/lib/mcsp-rbs";
 import type { OPDTaggingOverrides } from "@/lib/mcsp-rbs";
-import type { MCSPArea, OPDList, Submission, DocStatus } from "@prisma/client";
+import type { MCSPArea, OPDList, Submission, DocStatus, VerificationStatus } from "@prisma/client";
 
 interface ClientUser {
   email: string;
@@ -84,6 +87,10 @@ export function SubmissionsContent({ user, areas, opds, initialSubmissions, tagg
   const [evidenceType, setEvidenceType] = useState<"DOKUMEN" | "KERTAS_KERJA">("DOKUMEN");
   const [selectedDoc, setSelectedDoc] = useState<string>("");
   const [selectedWorkpaper, setSelectedWorkpaper] = useState<string>("");
+  const [selectedObjective, setSelectedObjective] = useState<string>("");
+  const [selectedIndicator, setSelectedIndicator] = useState<string>("");
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
   const [status, setStatus] = useState<DocStatus>("TERPENUHI");
   const [fileUrl, setFileUrl] = useState("");
   const [workpaperUrl, setWorkpaperUrl] = useState("");
@@ -151,23 +158,45 @@ export function SubmissionsContent({ user, areas, opds, initialSubmissions, tagg
       });
       return;
     }
+    if (selectedFile && selectedFile.size > 100 * 1024 * 1024) {
+      toast({ title: "File terlalu besar", description: "Ukuran maksimal setiap file adalah 100 MB.", variant: "destructive" });
+      return;
+    }
     setSaving("form");
     try {
+      let uploadedUrl = evidenceType === "DOKUMEN" ? fileUrl : workpaperUrl;
+      if (selectedFile) {
+        setUploading(true);
+        const formData = new FormData();
+        formData.append("file", selectedFile);
+        const selectedOptions = evidenceType === "DOKUMEN" ? hierarchicalDocuments : hierarchicalWorkpapers;
+        const selectedOptionIndex = selectedOptions.findIndex((item) => item.label === selectedEvidence);
+        const objectiveNumber = hierarchy.objectives.findIndex((item) => item.id === objective?.id) + 1;
+        const indicatorNumber = objective?.indicators.findIndex((item) => item.id === indicator?.id) + 1;
+        const itemPrefix = selectedOptionIndex >= 0
+          ? `${selectedArea}.${objectiveNumber}.${indicatorNumber}.${selectedOptionIndex + 1}`
+          : selectedEvidence;
+        formData.append("fileLabel", formatMCSPFileLabel(selectedEvidence, itemPrefix));
+        const uploadResponse = await fetch("/api/uploads", { method: "POST", body: formData });
+        const uploadResult = await uploadResponse.json() as { success?: boolean; url?: string; error?: string };
+        if (!uploadResponse.ok || !uploadResult.success || !uploadResult.url) throw new Error(uploadResult.error ?? "Upload file gagal.");
+        uploadedUrl = uploadResult.url;
+      }
       const result = await upsertSubmission(
         targetOpd,
         Number(selectedArea),
         selectedEvidence,
         status,
-        evidenceType === "DOKUMEN" ? fileUrl || undefined : undefined,
+        evidenceType === "DOKUMEN" ? uploadedUrl || undefined : undefined,
         note || undefined,
-        evidenceType === "KERTAS_KERJA" ? workpaperUrl || undefined : undefined
+        evidenceType === "KERTAS_KERJA" ? uploadedUrl || undefined : undefined
       );
       if (result.success) {
         toast({
           title: "Berhasil Disimpan",
           description: `Data "${selectedEvidence}" berhasil diperbarui.`,
         });
-        setSelectedDoc(""); setSelectedWorkpaper(""); setFileUrl(""); setWorkpaperUrl(""); setNote(""); setStatus("TERPENUHI");
+        setSelectedDoc(""); setSelectedWorkpaper(""); setSelectedObjective(""); setSelectedIndicator(""); setSelectedFile(null); setFileUrl(""); setWorkpaperUrl(""); setNote(""); setStatus("TERPENUHI");
         await refreshSubmissions();
       } else {
         toast({
@@ -177,6 +206,7 @@ export function SubmissionsContent({ user, areas, opds, initialSubmissions, tagg
         });
       }
     } finally {
+      setUploading(false);
       setSaving(null);
     }
   };
@@ -198,6 +228,18 @@ export function SubmissionsContent({ user, areas, opds, initialSubmissions, tagg
     } finally {
       setSaving(null);
     }
+  };
+
+  const handleVerification = async (sub: Submission, nextStatus: VerificationStatus) => {
+    setSaving(`verify-${sub.id}`);
+    const result = await verifySubmission(sub.id, nextStatus);
+    if (result.success) {
+      toast({ title: "Verifikasi disimpan", description: `Bukti ${sub.documentName} telah diperbarui.` });
+      await refreshSubmissions();
+    } else {
+      toast({ title: "Verifikasi gagal", description: result.error ?? "Terjadi kesalahan.", variant: "destructive" });
+    }
+    setSaving(null);
   };
 
   const filteredSubmissions = submissions.filter((s) => {
@@ -223,6 +265,14 @@ export function SubmissionsContent({ user, areas, opds, initialSubmissions, tagg
         Number(selectedArea), taggingOverrides
       )
     : [];
+
+  const hierarchy = selectedArea
+    ? getAreaHierarchy(currentOpdName ?? user.opdName ?? opds[0]?.opdName ?? "", Number(selectedArea), taggingOverrides)
+    : { objectives: [] };
+  const objective = hierarchy.objectives.find((item) => item.id === selectedObjective) ?? hierarchy.objectives[0];
+  const indicator = objective?.indicators.find((item) => item.id === selectedIndicator) ?? objective?.indicators[0];
+  const hierarchicalDocuments = indicator?.documents ?? [];
+  const hierarchicalWorkpapers = indicator?.workpapers ?? [];
 
   return (
     <div className="space-y-6">
@@ -450,7 +500,7 @@ export function SubmissionsContent({ user, areas, opds, initialSubmissions, tagg
                     </Label>
                     <Select
                       value={String(selectedArea)}
-                      onValueChange={(v) => { setSelectedArea(Number(v)); setSelectedDoc(""); setSelectedWorkpaper(""); }}
+                      onValueChange={(v) => { setSelectedArea(Number(v)); setSelectedDoc(""); setSelectedWorkpaper(""); setSelectedObjective(""); setSelectedIndicator(""); }}
                     >
                       <SelectTrigger><SelectValue placeholder="Pilih Area..." /></SelectTrigger>
                       <SelectContent>
@@ -458,6 +508,20 @@ export function SubmissionsContent({ user, areas, opds, initialSubmissions, tagg
                           <SelectItem key={a.id} value={String(a.id)}>{a.areaName}</SelectItem>
                         ))}
                       </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-sm font-semibold">Tujuan Pencegahan Korupsi</Label>
+                    <Select value={objective?.id ?? ""} onValueChange={(value) => { setSelectedObjective(value); setSelectedIndicator(""); }} disabled={!selectedArea}>
+                      <SelectTrigger><SelectValue placeholder="Pilih tujuan..." /></SelectTrigger>
+                      <SelectContent>{hierarchy.objectives.map((item, index) => <SelectItem key={item.id} value={item.id}>{formatMCSPHierarchyLabel(`${selectedArea}.${index + 1}`, item.label)}</SelectItem>)}</SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-sm font-semibold">Indikator</Label>
+                    <Select value={indicator?.id ?? ""} onValueChange={setSelectedIndicator} disabled={!objective}>
+                      <SelectTrigger><SelectValue placeholder="Pilih indikator..." /></SelectTrigger>
+                      <SelectContent>{(objective?.indicators ?? []).map((item, index) => <SelectItem key={item.id} value={item.id}>{formatMCSPHierarchyLabel(`${selectedArea}.${hierarchy.objectives.findIndex((entry) => entry.id === objective?.id) + 1}.${index + 1}`, item.label)}</SelectItem>)}</SelectContent>
                     </Select>
                   </div>
                   <div className="space-y-2">
@@ -483,11 +547,16 @@ export function SubmissionsContent({ user, areas, opds, initialSubmissions, tagg
                         <SelectValue placeholder={selectedArea ? `Pilih ${evidenceType === "DOKUMEN" ? "dokumen" : "kertas kerja"}...` : "Pilih Area dulu"} />
                       </SelectTrigger>
                       <SelectContent>
-                        {(evidenceType === "DOKUMEN" ? documentListForSelectedArea : workpaperListForSelectedArea).map((item, idx) => (
-                          <SelectItem key={idx} value={item}>{item}</SelectItem>
+                        {(evidenceType === "DOKUMEN" ? hierarchicalDocuments : hierarchicalWorkpapers).map((item, index) => (
+                          <SelectItem key={item.id} value={item.label}>{formatMCSPFileLabel(item.label, `${selectedArea}.${hierarchy.objectives.findIndex((entry) => entry.id === objective?.id) + 1}.${objective?.indicators.findIndex((entry) => entry.id === indicator?.id) + 1}.${index + 1}`)}{item.score !== undefined ? ` (bobot ${item.score})` : ""}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-sm font-semibold">Upload file (maksimal 100 MB)</Label>
+                    <Input type="file" onChange={(event) => setSelectedFile(event.target.files?.[0] ?? null)} />
+                    <p className="text-[11px] text-slate-500">Pilih file bukti atau gunakan URL di samping.</p>
                   </div>
                   <div className="space-y-2">
                     <Label className="text-sm font-semibold">Status Pemenuhan</Label>
@@ -739,9 +808,25 @@ export function SubmissionsContent({ user, areas, opds, initialSubmissions, tagg
                                       >
                                         {s.status === "TERPENUHI" ? "✓ Terpenuhi" : "○ Belum"}
                                       </Badge>
+                                      <div className="mt-1 text-[10px] text-slate-500">
+                                        {s.verificationStatus === "DIVERIFIKASI" ? "Diverifikasi" : s.verificationStatus === "PERLU_REVISI" ? "Perlu revisi" : s.verificationStatus === "DITOLAK" ? "Ditolak" : "Belum diverifikasi"}
+                                      </div>
                                     </TableCell>
                                     <TableCell className="text-center">
                                       <div className="flex items-center justify-center gap-1.5">
+                                        {user.role === "ADMIN_UTAMA" && (s.fileUrl || s.workpaperUrl) && (
+                                          <Button
+                                            type="button"
+                                            size="sm"
+                                            variant="outline"
+                                            className="h-8 text-xs gap-1"
+                                            onClick={() => handleVerification(s, "DIVERIFIKASI")}
+                                            disabled={saving === `verify-${s.id}`}
+                                          >
+                                            {saving === `verify-${s.id}` ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />}
+                                            Verifikasi
+                                          </Button>
+                                        )}
                                         <Button
                                           type="button"
                                           size="sm"

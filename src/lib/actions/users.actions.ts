@@ -30,6 +30,11 @@ interface CreateOPDResult {
   error?: string;
 }
 
+interface DeleteOPDResult {
+  success: boolean;
+  error?: string;
+}
+
 const MOCK_OPD_FOR_USERS: string[] = [
   "Badan Kepegawaian dan Pengembangan Sumber Daya Manusia",
   "Badan Pengelolaan Keuangan dan Aset Daerah",
@@ -108,6 +113,8 @@ export async function createUserOPD(
   password: string,
   opdName: string
 ): Promise<CreateUserResult> {
+  const currentUser = await getCurrentUser();
+  if (!currentUser || currentUser.role !== "ADMIN_UTAMA") return { success: false, error: "Hanya Admin Utama yang dapat mengelola user OPD." };
   if (!email || !password || !opdName) {
     return { success: false, error: "Email, password, dan nama OPD harus diisi." };
   }
@@ -133,18 +140,8 @@ export async function createUserOPD(
 
     return { success: true, user: created };
   } catch (dbError) {
-    console.warn("[users.actions.ts] createUserOPD DB error, using mock:", dbError instanceof Error ? dbError.message : String(dbError));
-
-    const mockUser: PublicUser = {
-      id: `mock-new-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-      email,
-      role: "ADMIN_OPD",
-      opdName,
-      createdAt: new Date(),
-    };
-
-    mutableMockUsers.push(mockUser);
-    return { success: true, user: mockUser };
+    console.error("[users.actions.ts] createUserOPD DB error:", dbError);
+    return { success: false, error: "User gagal dibuat karena database tidak tersedia." };
   }
 }
 
@@ -163,11 +160,13 @@ export async function getAllUsers(): Promise<PublicUser[]> {
     return users;
   } catch (dbError) {
     console.warn("[users.actions.ts] getAllUsers DB error, using mock:", dbError instanceof Error ? dbError.message : String(dbError));
-    return [...mutableMockUsers];
+    return [];
   }
 }
 
 export async function deleteUser(userId: string): Promise<DeleteUserResult> {
+  const currentUser = await getCurrentUser();
+  if (!currentUser || currentUser.role !== "ADMIN_UTAMA") return { success: false, error: "Hanya Admin Utama yang dapat menghapus user." };
   if (!userId) {
     return { success: false, error: "User ID tidak valid." };
   }
@@ -176,8 +175,26 @@ export async function deleteUser(userId: string): Promise<DeleteUserResult> {
     await prisma.user.delete({ where: { id: userId } });
     return { success: true };
   } catch (dbError) {
-    console.warn("[users.actions.ts] deleteUser DB error, using mock:", dbError instanceof Error ? dbError.message : String(dbError));
-    mutableMockUsers = mutableMockUsers.filter((u) => u.id !== userId);
+    console.error("[users.actions.ts] deleteUser DB error:", dbError);
+    return { success: false, error: "User gagal dihapus karena database tidak tersedia." };
+  }
+}
+
+export async function deleteOPD(opdName: string): Promise<DeleteOPDResult> {
+  const currentUser = await getCurrentUser();
+  if (!currentUser || currentUser.role !== "ADMIN_UTAMA") return { success: false, error: "Hanya Admin Utama yang dapat menghapus OPD." };
+  if (!opdName.trim()) return { success: false, error: "Nama OPD tidak valid." };
+
+  try {
+    await prisma.$transaction(async (transaction) => {
+      await transaction.user.deleteMany({ where: { opdName } });
+      await transaction.submission.deleteMany({ where: { opdName } });
+      await transaction.oPDTagProfile.deleteMany({ where: { opdName } });
+      await transaction.oPDList.delete({ where: { opdName } });
+    });
     return { success: true };
+  } catch (dbError) {
+    console.warn("[users.actions.ts] deleteOPD failed:", dbError instanceof Error ? dbError.message : String(dbError));
+    return { success: false, error: "OPD gagal dihapus. Periksa koneksi database." };
   }
 }

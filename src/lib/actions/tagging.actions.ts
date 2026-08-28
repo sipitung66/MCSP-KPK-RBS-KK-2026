@@ -2,6 +2,11 @@
 
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
+import type { TaggingHierarchy } from "@/lib/mcsp-rbs";
+import type { Prisma } from "@prisma/client";
+
+const ACTIVE_ASSESSMENT_YEAR = 2026;
+const ACTIVE_PERIOD = "TAHUNAN";
 
 export interface TaggingProfileRecord {
   id: string;
@@ -11,6 +16,7 @@ export interface TaggingProfileRecord {
   tags: string[];
   requiredDocs: string[];
   workpapers: string[];
+  hierarchy?: Record<number, TaggingHierarchy>;
 }
 
 interface SaveTaggingInput {
@@ -19,6 +25,7 @@ interface SaveTaggingInput {
   tags: string[];
   requiredDocs: string[];
   workpapers: string[];
+  hierarchy?: Record<number, TaggingHierarchy>;
 }
 
 function cleanList(values: string[]): string[] {
@@ -33,6 +40,7 @@ function validateInput(input: SaveTaggingInput): SaveTaggingInput | null {
     tags: cleanList(input.tags),
     requiredDocs: cleanList(input.requiredDocs),
     workpapers: cleanList(input.workpapers),
+    hierarchy: input.hierarchy,
   };
 }
 
@@ -50,6 +58,7 @@ export async function getAllTaggingProfiles(): Promise<TaggingProfileRecord[]> {
       tags: profile.tags,
       requiredDocs: profile.requiredDocs,
       workpapers: profile.workpapers,
+      hierarchy: profile.hierarchy as unknown as TaggingProfileRecord["hierarchy"],
     }));
   } catch (error) {
     console.warn("[tagging.actions.ts] Unable to load tagging profiles:", error instanceof Error ? error.message : String(error));
@@ -63,19 +72,37 @@ export async function saveTaggingProfile(input: SaveTaggingInput): Promise<{ suc
 
   const data = validateInput(input);
   if (!data) return { success: false, error: "OPD dan area wajib dipilih." };
-  if (data.tags.length === 0) return { success: false, error: "Minimal satu tag harus diisi." };
   if (data.requiredDocs.length === 0 && data.workpapers.length === 0) {
     return { success: false, error: "Isi minimal satu dokumen atau kertas kerja wajib." };
   }
 
   try {
     await prisma.oPDTagProfile.upsert({
-      where: { opdName_areaId: { opdName: data.opdName, areaId: data.areaId } },
-      create: data,
+      where: { opdName_areaId_assessmentYear_period: { opdName: data.opdName, areaId: data.areaId, assessmentYear: ACTIVE_ASSESSMENT_YEAR, period: ACTIVE_PERIOD } },
+      create: {
+        ...data,
+        hierarchy: data.hierarchy as Prisma.InputJsonValue | undefined,
+        assessmentYear: ACTIVE_ASSESSMENT_YEAR,
+        period: ACTIVE_PERIOD,
+        updatedBy: user.userId,
+      },
       update: {
         tags: data.tags,
         requiredDocs: data.requiredDocs,
         workpapers: data.workpapers,
+        hierarchy: data.hierarchy as Prisma.InputJsonValue | undefined,
+        assessmentYear: ACTIVE_ASSESSMENT_YEAR,
+        period: ACTIVE_PERIOD,
+        updatedBy: user.userId,
+      },
+    });
+    await prisma.auditLog.create({
+      data: {
+        entityType: "OPDTagProfile",
+        entityId: `${data.opdName}:${data.areaId}:${ACTIVE_ASSESSMENT_YEAR}:${ACTIVE_PERIOD}`,
+        action: "UPSERT",
+        actorId: user.userId,
+        afterData: data.hierarchy as Prisma.InputJsonValue | undefined,
       },
     });
     return { success: true };
@@ -91,7 +118,18 @@ export async function deleteTaggingProfile(id: string): Promise<{ success: boole
   if (!id) return { success: false, error: "Profil tagging tidak valid." };
 
   try {
+    const existing = await prisma.oPDTagProfile.findUnique({ where: { id } });
+    if (!existing) return { success: false, error: "Profil tagging tidak ditemukan." };
     await prisma.oPDTagProfile.delete({ where: { id } });
+    await prisma.auditLog.create({
+      data: {
+        entityType: "OPDTagProfile",
+        entityId: id,
+        action: "DELETE",
+        actorId: user.userId,
+        beforeData: existing.hierarchy as Prisma.InputJsonValue | undefined,
+      },
+    });
     return { success: true };
   } catch (error) {
     console.error("[tagging.actions.ts] deleteTaggingProfile failed:", error);

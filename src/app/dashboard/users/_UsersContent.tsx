@@ -53,7 +53,7 @@ import {
 import { cn } from "@/lib/utils";
 import { toast } from "@/components/ui/use-toast";
 import type { OPDList } from "@prisma/client";
-import { getAllUsers, createUserOPD, createOPD, deleteUser } from "@/lib/actions/users.actions";
+import { getAllUsers, createUserOPD, createOPD, deleteOPD, deleteUser } from "@/lib/actions/users.actions";
 import type { PublicUser } from "@/lib/actions/users.actions";
 
 interface UsersContentProps {
@@ -62,6 +62,7 @@ interface UsersContentProps {
 }
 
 export function UsersContent({ opds, initialUsers }: UsersContentProps) {
+  const [opdList, setOpdList] = useState(opds);
   const [users, setUsers] = useState(initialUsers);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterRole, setFilterRole] = useState<"all" | "ADMIN_UTAMA" | "ADMIN_OPD">("all");
@@ -97,9 +98,22 @@ export function UsersContent({ opds, initialUsers }: UsersContentProps) {
     total: users.length,
     adminUtama: users.filter((u) => u.role === "ADMIN_UTAMA").length,
     adminOPD: users.filter((u) => u.role === "ADMIN_OPD").length,
-    opdWithoutUser: opds.filter(
+    opdWithoutUser: opdList.filter(
       (o) => !users.some((u) => u.opdName === o.opdName && u.role === "ADMIN_OPD")
     ).length,
+  };
+
+  const handleDeleteOPD = async (opdName: string) => {
+    const linkedUsers = users.filter((user) => user.role === "ADMIN_OPD" && user.opdName === opdName).length;
+    if (!confirm(`Hapus OPD ${opdName}? ${linkedUsers} user OPD, submission, dan tagging terkait akan ikut dihapus.`)) return;
+    const result = await deleteOPD(opdName);
+    if (!result.success) {
+      toast({ title: "Gagal menghapus OPD", description: result.error ?? "Terjadi kesalahan.", variant: "destructive" });
+      return;
+    }
+    setOpdList((current) => current.filter((opd) => opd.opdName !== opdName));
+    setUsers((current) => current.filter((user) => user.opdName !== opdName));
+    toast({ title: "OPD dihapus", description: `${opdName} berhasil dihapus.` });
   };
 
   const resetForm = () => {
@@ -292,6 +306,30 @@ export function UsersContent({ opds, initialUsers }: UsersContentProps) {
         </Card>
       </div>
 
+      <Card className="border-slate-200 shadow-sm">
+        <CardContent className="p-5">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <div>
+              <h2 className="font-bold text-slate-800">Daftar OPD</h2>
+              <p className="text-xs text-slate-500">Penghapusan OPD ikut menghapus user, submission, dan tagging terkait.</p>
+            </div>
+            <Badge variant="secondary">{opdList.length} OPD</Badge>
+          </div>
+          <div className="grid gap-2 md:grid-cols-2">
+            {opdList.map((opd) => {
+              return (
+                <div key={opd.id} className="flex items-center justify-between gap-3 rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
+                  <span className="min-w-0 truncate text-sm text-slate-700">{opd.opdName}</span>
+                  <Button type="button" size="icon" variant="ghost" title="Hapus OPD dan data terkait" onClick={() => handleDeleteOPD(opd.opdName)}>
+                    <Trash2 className="h-4 w-4 text-rose-600" />
+                  </Button>
+                </div>
+              );
+            })}
+          </div>
+        </CardContent>
+      </Card>
+
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div className="flex flex-col sm:flex-row gap-3 flex-1">
           <div className="relative flex-1 sm:max-w-md">
@@ -415,7 +453,7 @@ export function UsersContent({ opds, initialUsers }: UsersContentProps) {
                     <SelectValue placeholder="Pilih OPD..." />
                   </SelectTrigger>
                   <SelectContent>
-                    {opds.map((o) => {
+                    {opdList.map((o) => {
                       const hasUser = users.some(
                         (u) => u.opdName === o.opdName && u.role === "ADMIN_OPD"
                       );

@@ -177,7 +177,7 @@
 
   .login-page { background: #061f3d; }
   .login-hero-photo {
-    background-image: url("/logos/publiclogin-background.jpg");
+    background-image: url("/logos/publiclogin-background.jpg?v=20260827");
     background-size: cover;
     background-position: center;
     background-repeat: no-repeat;

@@ -1,3 +1,5 @@
+import { getMCSPWorkpaperOptions, MCSP_WORKPAPER_OPTIONS } from "@/lib/mcsp-workpapers";
+
 export interface AreaDocumentRequirement {
   areaId: number;
   areaName: string;
@@ -5,9 +7,33 @@ export interface AreaDocumentRequirement {
   workpapers?: string[];
 }
 
+export interface TaggingOption {
+  id: string;
+  label: string;
+  score?: number;
+}
+
+export interface TaggingIndicator {
+  id: string;
+  label: string;
+  documents: TaggingOption[];
+  workpapers: TaggingOption[];
+}
+
+export interface TaggingObjective {
+  id: string;
+  label: string;
+  indicators: TaggingIndicator[];
+}
+
+export interface TaggingHierarchy {
+  objectives: TaggingObjective[];
+}
+
 export interface OPDTagProfile {
   tags: string[];
   requirements: AreaDocumentRequirement[];
+  hierarchy?: Record<number, TaggingHierarchy>;
 }
 
 export type OPDTaggingOverrides = Record<string, OPDTagProfile>;
@@ -303,19 +329,28 @@ export function getOPDTagProfile(opdName: string, overrides?: OPDTaggingOverride
   const override = overrides?.[normalized];
   const customProfile = OPD_TAGGING[normalized] ?? DEFAULT_PROFILE;
 
-  if (!override) return customProfile;
+  if (!override) {
+    return {
+      ...customProfile,
+      requirements: customProfile.requirements.map((item) => ({
+        ...item,
+        workpapers: getMCSPWorkpaperOptions(item.areaId),
+      })),
+    };
+  }
 
   const overrideAreas = new Map(override.requirements.map((item) => [item.areaId, item]));
   return {
-    tags: override.tags,
+    tags: override.tags.length > 0 ? override.tags : customProfile.tags,
     requirements: customProfile.requirements.map((item) => overrideAreas.get(item.areaId) ?? item),
+    hierarchy: override.hierarchy,
   };
 }
 
 export function getRequiredDocumentsForOPD(opdName: string, overrides?: OPDTaggingOverrides): AreaDocumentRequirement[] {
   return getOPDTagProfile(opdName, overrides).requirements.map((item) => ({
     ...item,
-    workpapers: item.workpapers ?? DEFAULT_AREA_WORKPAPERS[item.areaId] ?? [],
+    workpapers: item.workpapers ?? getMCSPWorkpaperOptions(item.areaId),
   }));
 }
 
@@ -335,10 +370,29 @@ export function getAreaRequiredWorkpapers(opdName: string, areaId: number, overr
   const areaRequirement = profile.requirements.find((item) => item.areaId === areaId);
 
   if (areaRequirement) {
-    return areaRequirement.workpapers ?? DEFAULT_AREA_WORKPAPERS[areaId] ?? [];
+    return areaRequirement.workpapers ?? getMCSPWorkpaperOptions(areaId);
   }
 
-  return DEFAULT_AREA_WORKPAPERS[areaId] ?? [];
+  return getMCSPWorkpaperOptions(areaId);
+}
+
+export function getAreaHierarchy(opdName: string, areaId: number, overrides?: OPDTaggingOverrides): TaggingHierarchy {
+  const configured = getOPDTagProfile(opdName, overrides).hierarchy?.[areaId];
+  if (configured?.objectives?.length) return configured;
+  const requirement = getRequiredDocumentsForOPD(opdName, overrides).find((item) => item.areaId === areaId);
+  const indicatorWorkpapers = MCSP_WORKPAPER_OPTIONS[areaId] ?? { 1: [] };
+  return {
+    objectives: [{
+      id: `objective-${areaId}`,
+      label: "Tujuan Pencegahan Korupsi",
+      indicators: Object.entries(indicatorWorkpapers).map(([indicatorNo, workpapers], index) => ({
+        id: `indicator-${areaId}-${indicatorNo}`,
+        label: `Indikator ${index + 1} ${requirement?.areaName ?? `Area ${areaId}`}`,
+        documents: index === 0 ? (requirement?.requiredDocs ?? []).map((label, documentIndex) => ({ id: `document-${areaId}-${documentIndex}`, label })) : [],
+        workpapers: workpapers.map((label, workpaperIndex) => ({ id: `workpaper-${areaId}-${indicatorNo}-${workpaperIndex}`, label })),
+      })),
+    }],
+  };
 }
 
 export function getOPDComplianceSnapshot(

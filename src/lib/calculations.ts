@@ -13,6 +13,8 @@ export interface WeightedRequirement {
   areaName: string;
   requiredDocs?: string[];
   workpapers?: string[];
+  documentWeights?: Record<string, number>;
+  workpaperWeights?: Record<string, number>;
 }
 
 export interface OPDProgress {
@@ -54,6 +56,11 @@ interface BaseSubmission {
   areaId: number;
   documentName?: string;
   status: "TERPENUHI" | "BELUM_TERPENUHI";
+  verificationStatus?: "BELUM_DIVERIFIKASI" | "DIVERIFIKASI" | "PERLU_REVISI" | "DITOLAK";
+}
+
+function isVerified(submission: BaseSubmission): boolean {
+  return submission.status === "TERPENUHI" && submission.verificationStatus === "DIVERIFIKASI";
 }
 
 interface BaseMCSPArea {
@@ -85,32 +92,40 @@ export function calculateWeightedRequirementCompletion(
     const docs = requirement.requiredDocs ?? [];
     const workpapers = requirement.workpapers ?? [];
 
-    const targetForArea = docs.length + workpapers.length * 0.5;
+    const documentWeights = requirement.documentWeights ?? {};
+    const workpaperWeights = requirement.workpaperWeights ?? {};
+    const targetForArea = docs.reduce((sum, name) => sum + (documentWeights[name] ?? 1), 0)
+      + workpapers.reduce((sum, name) => sum + (workpaperWeights[name] ?? 0.5), 0);
     weightedTarget += targetForArea;
 
-    const completedDocs = docs.filter((docName) =>
+    const completedDocNames = docs.filter((docName) =>
       submissions.some(
         (submission) =>
           submission.areaId === requirement.areaId &&
           normalizeRequirementName(submission.documentName ?? "") === normalizeRequirementName(docName) &&
-          submission.status === "TERPENUHI"
+          isVerified(submission)
       )
-    ).length;
+    );
 
-    const completedWorkpapers = workpapers.filter((workpaperName) =>
+    const completedWorkpaperNames = workpapers.filter((workpaperName) =>
       submissions.some(
         (submission) =>
           submission.areaId === requirement.areaId &&
-          submission.status === "TERPENUHI" &&
+          isVerified(submission) &&
           (
             normalizeRequirementName(submission.documentName ?? "") === normalizeRequirementName(workpaperName) ||
             normalizeRequirementName(submission.documentName ?? "").includes(normalizeRequirementName(workpaperName)) ||
             normalizeRequirementName(workpaperName).includes(normalizeRequirementName(submission.documentName ?? ""))
           )
       )
-    ).length;
+      );
 
-    weightedCompleted += completedDocs + completedWorkpapers * 0.5;
+    weightedCompleted += docs
+      .filter((docName) => completedDocNames.includes(docName))
+      .reduce((sum, docName) => sum + (documentWeights[docName] ?? 1), 0);
+    weightedCompleted += workpapers
+      .filter((workpaperName) => completedWorkpaperNames.includes(workpaperName))
+      .reduce((sum, workpaperName) => sum + (workpaperWeights[workpaperName] ?? 0.5), 0);
   }
 
   return {
@@ -138,7 +153,7 @@ export function hitungProgresPerArea(
   const terpenuhiPerArea = new Map<number, number>();
 
   for (const s of submissions) {
-    if (s.status === "TERPENUHI") {
+    if (isVerified(s)) {
       const current = terpenuhiPerArea.get(s.areaId) ?? 0;
       terpenuhiPerArea.set(s.areaId, current + 1);
     }
@@ -149,7 +164,7 @@ export function hitungProgresPerArea(
     const docs = requirement?.requiredDocs ?? [];
     const workpapers = requirement?.workpapers ?? [];
     const weightedTarget = docs.length + workpapers.length * 0.5;
-    const areaSubmissionCount = submissions.filter((s) => s.areaId === area.id && s.status === "TERPENUHI").length;
+    const areaSubmissionCount = submissions.filter((s) => s.areaId === area.id && isVerified(s)).length;
     const target = requirement ? weightedTarget : area.targetDocs;
 
     let weightedCompleted = 0;
@@ -159,7 +174,7 @@ export function hitungProgresPerArea(
           (submission) =>
             submission.areaId === area.id &&
             normalizeRequirementName(submission.documentName ?? "") === normalizeRequirementName(docName) &&
-            submission.status === "TERPENUHI"
+            isVerified(submission)
         )
       ).length;
 
@@ -167,7 +182,7 @@ export function hitungProgresPerArea(
         submissions.some(
           (submission) =>
             submission.areaId === area.id &&
-            submission.status === "TERPENUHI" &&
+            isVerified(submission) &&
             (
               normalizeRequirementName(submission.documentName ?? "") === normalizeRequirementName(workpaperName) ||
               normalizeRequirementName(submission.documentName ?? "").includes(normalizeRequirementName(workpaperName)) ||
@@ -210,7 +225,7 @@ export function hitungRasioOPD(
       opdData = { terpenuhi: 0, totalPerArea: new Map<number, number>() };
       opdMap.set(s.opdName, opdData);
     }
-    if (s.status === "TERPENUHI") {
+    if (isVerified(s)) {
       opdData.terpenuhi += 1;
     }
   }
@@ -269,7 +284,7 @@ export function hitungKumulatifGlobal(
   const totalTarget =
     areas.reduce((sum, a) => sum + a.targetDocs, 0) * Math.max(opdCount, 1);
   const totalTerpenuhi = submissions.filter(
-    (s) => s.status === "TERPENUHI"
+    (s) => isVerified(s)
   ).length;
   const persentase = hitungPersentase(totalTerpenuhi, totalTarget);
 

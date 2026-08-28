@@ -26,7 +26,7 @@ const AREAS = [
   {
     id: 2,
     areaName: "Pengadaan Barang dan Jasa (PBJ)",
-    targetDocs: 6,
+    targetDocs: 13,
     description:
       "Area strategis terkait proses pengadaan barang dan jasa pemerintah sesuai Permen PUPR & LKPP.",
     sampleDocs: [
@@ -108,7 +108,7 @@ const AREAS = [
   {
     id: 7,
     areaName: "Penguatan APIP",
-    targetDocs: 6,
+    targetDocs: 23,
     description:
       "Area strategis terkait penguatan peran Inspektorat Daerah sebagai Aparat Pengawasan Intern Pemerintah.",
     sampleDocs: [
@@ -121,6 +121,42 @@ const AREAS = [
     ],
   },
 ];
+
+const INDICATORS = [
+  [1, "Menilai risiko korupsi pada proses perencanaan dan penganggaran melalui usulan pokok pikiran DPRD", "Perencanaan dan Penganggaran melalui usulan pokok pikiran DPRD", "Tim Anggaran/KLOP, Sekretariat Dewan, Inspektorat", 10, "BOBOT_DOKUMEN"],
+  [1, "Menilai risiko korupsi pada proses perencanaan dan penganggaran melalui hibah, bansos, dan bantuan keuangan", "Perencanaan dan penganggaran yang berasal hibah, bantuan keuangan dan bansos", "Tim Anggaran/KLOP, Sekretariat Dewan, Inspektorat", 9, "BOBOT_DOKUMEN"],
+  [1, "Menilai risiko korupsi pada proses perencanaan dan penganggaran melalui perjalanan dinas dan honorarium DPRD", "Perencanaan dan penganggaran pada perjalanan dinas dan honorarium DPRD", "Tim Anggaran/KLOP, Sekretariat Dewan, Inspektorat", 6, "BOBOT_DOKUMEN"],
+  [2, "Memastikan transparansi dan akuntabilitas perencanaan pengadaan sejak awal tahun", "Transparansi Pengadaan Barang dan Jasa", "Sekda, BPKD, UKPBJ", 1, "BINER_0_100"],
+  [2, "Meningkatkan efisiensi belanja dan mencegah fragmentasi paket", "Konsolidasi Pengadaan Barang dan Jasa", "Sekda, BPKD, UKPBJ", 2, "BERTINGKAT_0_75_25"],
+  [2, "Mendapatkan harga yang kompetitif pada Pengadaan Barang dan Jasa", "Pengendalian Risiko Pemecahan Paket pada Pengadaan Langsung", "Sekda, BPKD, UKPBJ", 3, "BOBOT_TAHUN"],
+  [2, "Paket Pengadaan Barang dan Jasa Strategis ditetapkan sebelum 31 Maret", "Pengadaan Barang dan Jasa Strategis", "Sekda, BPKD, UKPBJ", 2, "BERTINGKAT_0_80_100"],
+  [2, "Memastikan integritas transaksi e-purchasing dan mencegah fraud", "Pengadaan Barang dan Jasa melalui E-Purchasing", "Inspektorat, OPD Terkait", 4, "BOBOT_DOKUMEN"],
+  [2, "Memastikan pelaksanaan kontrak PBJ sesuai capaian pekerjaan", "Pengendalian Keterlambatan Pelaksanaan Kontrak PBJ", "PPK, Inspektorat", 1, "BINER_0_100"],
+  [3, "Pemda menetapkan regulasi RTRW dan RDTR sebagai dasar pemberian izin", "Kebijakan dan Regulasi Tata Ruang", "Kepala Daerah, Sekda, DPMPTSP, OPD terkait, Inspektorat", 5, "PROPORSIONAL"],
+  [3, "Mencukupi regulasi pelayanan perizinan dan mencegah praktik korupsi", "Kecukupan dan Kepatuhan Regulasi pada Pelayanan Perizinan", "Sekda, DPMPTSP, OPD terkait, Inspektorat", 6, "BOBOT_DOKUMEN"],
+  [3, "Pelaksanaan penerbitan rekomendasi teknis dan perizinan sesuai ketentuan", "Pelaksanaan dan Proses Pelayanan Perizinan", "Kepala Daerah, Sekda, DPMPTSP", 3, "PROPORSIONAL"],
+  [3, "Menyediakan saluran pengaduan dan publikasi penanganan pengaduan", "Layanan Pengaduan", "Sekda, DPMPTSP, OPD layanan, Inspektorat, Diskominfo/Humas", 3, "BOBOT_DOKUMEN"],
+  [3, "Mencegah korupsi pada layanan publik melalui kebijakan dan regulasi", "Larangan Gratifikasi/Suap/Pemerasan pada Layanan Publik", "Sekda, DPMPTSP, OPD layanan, Inspektorat, Diskominfo/Humas", 1, "BINER_0_100"],
+  [4, "Mendorong pengisian jabatan ASN yang objektif dan akuntabel", "Pengisian Jabatan Pimpinan Tinggi/Administrator", "PPK, Sekda, BKD/BPSDM, Inspektorat, TPK", 8, "BOBOT_DOKUMEN"],
+  [4, "Mendorong rotasi dan mutasi ASN yang objektif dan transparan", "Rotasi dan Mutasi Pegawai", "PPK, Sekda, BKD/BPSDM, Inspektorat, TPK", 3, "BOBOT_DOKUMEN"],
+  [4, "Memperkuat budaya antikorupsi melalui pelaporan kekayaan", "Kepatuhan Pelaporan LHKPN", "Sekda, Biro Hukum, BKD/BPSDM, Inspektorat", 0, "INTEROPERABILITAS_E_LHKPN"],
+  [4, "Memperkuat kelembagaan UPG dalam pengendalian gratifikasi", "Pengendalian Gratifikasi", "Sekda, Biro Hukum, BKD/BPSDM, Inspektorat", 0, "INTEROPERABILITAS_GOL"],
+  [5, "Mengamankan administrasi Barang Milik Daerah", "Pemutakhiran Database Aset Barang Milik Daerah", "Sekda, BPKAD, OPD Pengguna Aset, Inspektorat", 3, "BINER_0_100"],
+  [5, "Mengamankan legalitas dan penguasaan fisik aset", "Peningkatan Legalitas dan Capaian Penertiban Aset", "BPKAD, OPD Pengguna Aset, Inspektorat", 5, "BOBOT_TAHUN_TRIWULAN"],
+  [5, "Meningkatkan efisiensi pengadaan BMD", "Pengadaan BMD Berdasarkan RKBMD dan Efisiensi HPS", "BPKAD, OPD Pengguna Aset, UKPBJ, Inspektorat", 5, "BOBOT_DOKUMEN"],
+  [5, "Mengoptimalkan pemanfaatan BMD", "Pemanfaatan Aset secara Optimal", "BPKAD, OPD Pengguna Aset, Inspektorat", 4, "BOBOT_DOKUMEN"],
+  [5, "Mencegah penghapusan dan pemindahtanganan aset tidak prosedural", "Penghapusan dan Pemindahtanganan Aset", "BPKAD, OPD Pengguna Aset, Inspektorat", 5, "BINER_0_100"],
+  [5, "Memastikan serah terima PSU disertai BAST dan tercatat sebagai BMD", "Penertiban PSU", "BPKAD, Dinas PUTR/PERKIM, Inspektorat", 3, "BOBOT_DOKUMEN"],
+  [6, "Meningkatkan transparansi capaian Pendapatan Asli Daerah", "Digitalisasi Transparansi Pendapatan Asli Daerah", "Sekda, Bapenda, Diskominfo, Inspektorat", 4, "BOBOT_DOKUMEN"],
+  [6, "Meningkatkan pajak dan menindaklanjuti hasil pengawasan", "Capaian Realisasi dan Pengawasan Pajak Daerah", "Sekda, Inspektur, BPKAD, Bapenda", 8, "AMBANG_REALISASI"],
+  [6, "Melaksanakan penagihan piutang pajak daerah dan penegakan hukum", "Capaian Realisasi Penagihan Piutang Pajak Daerah", "Sekda, Bapenda, BPKAD, Hukum, Satpol PP, Inspektorat", 5, "AMBANG_PROPORSIONAL"],
+  [7, "Menyelesaikan tindak lanjut rekomendasi hasil pemeriksaan BPK", "Tindak Lanjut Temuan BPK", "Inspektorat, OPD Terkait", 1, "PROPORSIONAL"],
+  [7, "Melaksanakan probity audit pada pengadaan strategis daerah", "Probity Audit pada Pengadaan Strategis Daerah", "Sekda, Inspektorat, UKPBJ, OPD Terkait", 5, "BOBOT_TAHAPAN"],
+  [7, "Melaksanakan pengawasan berbasis risiko untuk pencegahan korupsi", "Pengawasan dalam Rangka Pencegahan Korupsi", "Sekda, Inspektorat, Perangkat Daerah Terkait", 9, "BOBOT_DOKUMEN_PROPORSIONAL"],
+  [7, "Menyelesaikan pengaduan yang terindikasi korupsi", "Tindak Lanjut Pengaduan Masyarakat", "Inspektorat", 1, "PROPORSIONAL"],
+  [7, "Memperkuat SDM dan anggaran APIP", "Penguatan SDM dan Anggaran APIP", "Sekda, BKPSDM, Organisasi, BPKAD, Inspektorat", 0, "INTEROPERABILITAS_SICUKUP"],
+  [7, "Memperkuat tata kelola dan pembenahan pelayanan publik berdasarkan SPI", "Tindak Lanjut Rencana Aksi SPI", "Sekda, Inspektorat, seluruh perangkat daerah terkait", 0, "INTEROPERABILITAS_SPI"],
+] as const;
 
 const OPDS: string[] = [
   "BKPSDM",
@@ -175,10 +211,35 @@ async function main() {
   }
   const totalTarget = AREAS.reduce((sum, a) => sum + a.targetDocs, 0);
   console.log(
-    `  -> 7 Area berhasil dibuat. Total target dokumen: ${totalTarget} (25+6+30+20+35+16+6 = ${totalTarget})`
+    `  -> 7 Area berhasil dibuat. Total target dokumen: ${totalTarget} (pedoman MCSP-RBS 2026: 162)`
   );
 
-  console.log("\n[2/5] Membuat 15 OPD Kabupaten Konawe...");
+  console.log("\n[2/6] Membuat 33 indikator resmi MCSP-RBS 2026...");
+  const indicatorNumbers: Record<number, number> = {};
+  for (const [areaId, objective, indicatorName, responsible, documentCount, scoringMethod] of INDICATORS) {
+    indicatorNumbers[areaId] = (indicatorNumbers[areaId] ?? 0) + 1;
+    const indicatorNo = indicatorNumbers[areaId];
+    const indicatorId = `mcsp-2026-area-${areaId}-indicator-${indicatorNo}`;
+    await prisma.mCSPIndicator.upsert({
+      where: { id: indicatorId },
+      update: { areaId, indicatorNo, objective, indicatorName, responsible, documentCount, scoringMethod, assessmentYear: 2026 },
+      create: {
+        id: indicatorId,
+        areaId,
+        indicatorNo,
+        objective,
+        indicatorName,
+        responsible,
+        documentCount,
+        scoringMethod,
+        assessmentYear: 2026,
+        sourceSystem: scoringMethod.startsWith("INTEROPERABILITAS") ? scoringMethod.replace("INTEROPERABILITAS_", "") : null,
+      },
+    });
+  }
+  console.log(`  -> ${INDICATORS.length} indikator berhasil dibuat.`);
+
+  console.log("\n[3/6] Membuat 15 OPD Kabupaten Konawe...");
   for (const opdName of OPDS) {
     await prisma.oPDList.upsert({
       where: { opdName },
@@ -188,7 +249,7 @@ async function main() {
   }
   console.log(`  -> ${OPDS.length} OPD berhasil dibuat.`);
 
-  console.log("\n[3/5] Membuat User...");
+  console.log("\n[4/6] Membuat User...");
   const adminEmail =
     process.env.DEFAULT_ADMIN_EMAIL || "admin.mcsp@konawekab.go.id";
   const adminPassword =
@@ -245,16 +306,23 @@ async function main() {
         try {
           await prisma.submission.upsert({
             where: {
-              opdName_areaId_documentName: {
+              opdName_areaId_documentName_assessmentYear_period: {
                 opdName,
                 areaId: area.id,
                 documentName: docName,
+                assessmentYear: 2026,
+                period: "TAHUNAN",
               },
             },
             update: {
               status: DocStatus.TERPENUHI,
               note: "Sample seed data - otomatis terpenuhi",
               submittedBy: adminEmail,
+              assessmentYear: 2026,
+              period: "TAHUNAN",
+              verificationStatus: "DIVERIFIKASI",
+              verifiedBy: adminEmail,
+              verifiedAt: new Date(),
             },
             create: {
               opdName,
@@ -263,6 +331,11 @@ async function main() {
               status: DocStatus.TERPENUHI,
               note: "Sample seed data - otomatis terpenuhi",
               submittedBy: adminEmail,
+              assessmentYear: 2026,
+              period: "TAHUNAN",
+              verificationStatus: "DIVERIFIKASI",
+              verifiedBy: adminEmail,
+              verifiedAt: new Date(),
             },
           });
           submissionCount++;
@@ -286,10 +359,12 @@ async function main() {
         try {
           await prisma.submission.upsert({
             where: {
-              opdName_areaId_documentName: {
+              opdName_areaId_documentName_assessmentYear_period: {
                 opdName,
                 areaId: area.id,
                 documentName: docName,
+                assessmentYear: 2026,
+                period: "TAHUNAN",
               },
             },
             update: {},
@@ -299,6 +374,8 @@ async function main() {
               documentName: docName,
               status: DocStatus.BELUM_TERPENUHI,
               note: "Belum diunggah",
+              assessmentYear: 2026,
+              period: "TAHUNAN",
             },
           });
           belumCount++;
