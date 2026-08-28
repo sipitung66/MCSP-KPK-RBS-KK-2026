@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - fitur-tagging-pemenuhan-dokumen-kk-opd
   workflow_dispatch:
 
 env:
@@ -42,3 +43,25 @@ jobs:
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  deploy:
+    needs: publish
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/fitur-tagging-pemenuhan-dokumen-kk-opd'
+    steps:
+      - name: Deploy to VPS
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          passphrase: ${{ secrets.VPS_SSH_PASSPHRASE }}
+          script_stop: true
+          script: |
+            cd "${{ secrets.VPS_DEPLOY_PATH }}"
+            git fetch origin
+            git checkout "${{ github.ref_name }}"
+            git pull --ff-only origin "${{ github.ref_name }}"
+            docker compose pull app
+            docker compose up -d --no-build app
+            docker compose ps
