@@ -20,5 +20,5 @@ if errorlevel 1 (
 
 echo.
 echo Container dan database MCSP berhasil dihapus.
-echo Data seed tidak dibuat ulang.
+echo Saat aplikasi dibangun/dijalankan kembali, akun admin default akan dibuat ulang otomatis.
 pause

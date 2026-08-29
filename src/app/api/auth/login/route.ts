@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
-import { createSession, setSessionCookie } from "@/lib/auth";
+import { createSession, ensureMandatoryAdminUser, setSessionCookie } from "@/lib/auth";
 import type { UserRole } from "@prisma/client";
 
 interface LoginRequestBody {
@@ -43,6 +43,8 @@ export async function POST(request: NextRequest): Promise<NextResponse<LoginResp
   }
 
   try {
+    await ensureMandatoryAdminUser();
+
     const user = await prisma.user.findUnique({ where: { email } });
 
     if (!user) {

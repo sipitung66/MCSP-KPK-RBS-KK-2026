@@ -35,12 +35,12 @@ const bcrypt = require('bcryptjs');
 
 async function main() {
   const users = [
-    { email: 'admin.mcsp@konawekab.go.id', password: 'AdminMCSP@Konawe2026!' },
+    { email: 'admin.mcsp@konawekab.go.id', password: 'admin123@' },
     { email: 'admin.bkpsdm@konawekab.go.id', password: 'AdminBKPSDM@2026!' },
     { email: 'admin.bpkad@konawekab.go.id', password: 'AdminBPKAD@2026!' },
     { email: 'admin.dinaspupr@konawekab.go.id', password: 'AdminDinasPUPR@2026!' }
   ];
-  
+
   for (const user of users) {
     const hash = await bcrypt.hash(user.password, 10);
     console.log(`UPDATE "users" SET password = '${hash}' WHERE email = '${user.email}';`);
@@ -68,7 +68,6 @@ echo "✅ Password hashes generated"
 echo ""
 echo "[2/2] Updating database..."
 
-# Execute SQL commands
 echo "$SQL_COMMANDS" | docker exec -i $CONTAINER_NAME psql -U $DB_USER -d $DB_NAME
 
 if [ $? -eq 0 ]; then
@@ -76,12 +75,12 @@ if [ $? -eq 0 ]; then
     echo "✅ Update berhasil!"
     echo ""
     echo "=================================="
-    echo "Credential Baru (sama dengan localhost)"
+    echo "Credential Baru (mandatory)"
     echo "=================================="
     echo ""
     echo "📌 ADMIN_UTAMA:"
     echo "   Email: admin.mcsp@konawekab.go.id"
-    echo "   Password: AdminMCSP@Konawe2026!"
+    echo "   Password: admin123@"
     echo ""
     echo "📌 ADMIN_OPD BKPSDM:"
     echo "   Email: admin.bkpsdm@konawekab.go.id"

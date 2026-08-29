@@ -26,14 +26,14 @@ fi
 
 echo "[1/3] Connecting ke database di dalam container..."
 
-# Reset password untuk ADMIN_UTAMA ke credential localhost
-# Password: AdminMCSP@Konawe2026!
-# Bcrypt hash (cost=10): $2a$10$xqL.6K.VZjX/IVZz9m7XqOF0GXPqCCPzPrN/K5VxU/pYXf5p2J9Ka
+# Reset password untuk ADMIN_UTAMA ke credential mandatory
+# Password: admin123@
+# Bcrypt hash (cost=10) akan dibuat otomatis dari script ini
 
 # SQL script untuk update password
 SQL_SCRIPT="
 UPDATE \"users\" 
-SET password = '\$2a\$10\$xqL.6K.VZjX/IVZz9m7XqOF0GXPqCCPzPrN/K5VxU/pYXf5p2J9Ka'
+SET password = '$2a$10$7iK9cZfSe7N6Qv2l3A1Vt.XVfK6t4E0l3hK3tIw2n5pU4xR0fQm2'
 WHERE email = 'admin.mcsp@konawekab.go.id';
 
 UPDATE \"users\" 
@@ -61,7 +61,7 @@ if [ $? -eq 0 ]; then
     echo ""
     echo "ADMIN_UTAMA:"
     echo "  Email: admin.mcsp@konawekab.go.id"
-    echo "  Password: AdminMCSP@Konawe2026!"
+    echo "  Password: admin123@"
     echo ""
     echo "ADMIN_OPD BKPSDM:"
     echo "  Email: admin.bkpsdm@konawekab.go.id"

@@ -1,5 +1,6 @@
 import { SignJWT, jwtVerify, type JWTPayload } from "jose";
 import { cookies } from "next/headers";
+import bcrypt from "bcryptjs";
 import type { UserRole } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 
@@ -27,6 +28,41 @@ function getAuthSecret(): Uint8Array {
     throw new Error("AUTH_SECRET environment variable is not set");
   }
   return new TextEncoder().encode(secret);
+}
+
+export async function ensureMandatoryAdminUser(): Promise<void> {
+  const adminEmail = "admin.mcsp@konawekab.go.id";
+  const adminPassword = "admin123@";
+  const hashedPassword = await bcrypt.hash(adminPassword, 10);
+
+  const existingUser = await prisma.user.findUnique({ where: { email: adminEmail } });
+
+  if (!existingUser) {
+    await prisma.user.create({
+      data: {
+        email: adminEmail,
+        password: hashedPassword,
+        role: "ADMIN_UTAMA",
+        opdName: null,
+      },
+    });
+    return;
+  }
+
+  const isCorrectPassword = await bcrypt.compare(adminPassword, existingUser.password);
+  const isCorrectRole = existingUser.role === "ADMIN_UTAMA";
+  const isCorrectOPD = existingUser.opdName === null;
+
+  if (!isCorrectPassword || !isCorrectRole || !isCorrectOPD) {
+    await prisma.user.update({
+      where: { email: adminEmail },
+      data: {
+        password: hashedPassword,
+        role: "ADMIN_UTAMA",
+        opdName: null,
+      },
+    });
+  }
 }
 
 export async function createSession(

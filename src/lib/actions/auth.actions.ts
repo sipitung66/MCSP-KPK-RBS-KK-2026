@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 import {
   createSession,
+  ensureMandatoryAdminUser,
   setSessionCookie,
   clearSessionCookie,
   getCurrentUser,
@@ -42,6 +43,8 @@ export async function login(
     const emailLower = email.toLowerCase();
 
     try {
+      await ensureMandatoryAdminUser();
+
       const user = await prisma.user.findUnique({
         where: { email: emailLower },
       });

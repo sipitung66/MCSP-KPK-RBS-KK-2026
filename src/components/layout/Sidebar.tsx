@@ -134,35 +134,6 @@ export function Sidebar({ user }: SidebarProps) {
         })}
       </nav>
 
-      <div className="border-t border-slate-800/60 p-3 space-y-3">
-        <div className="flex items-center gap-3 px-2 py-2 rounded-lg bg-slate-800/40">
-          <div className="flex items-center justify-center w-10 h-10 rounded-full bg-gradient-to-br from-teal-500 to-teal-800 text-white text-sm font-bold shrink-0 shadow-md">
-            {getInitials(user.email)}
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-white text-sm font-semibold truncate">
-              {user.opdName ?? "Admin Utama"}
-            </p>
-            <Badge
-              variant={getRoleBadgeVariant(user.role)}
-              className="mt-0.5 text-[10px] px-2 py-0"
-            >
-              {getRoleLabel(user.role)}
-            </Badge>
-          </div>
-        </div>
-
-        <form action={logout}>
-          <Button
-            type="submit"
-            variant="ghost"
-            className="w-full justify-start text-slate-300 hover:text-rose-300 hover:bg-rose-950/30 px-3 py-2 h-auto"
-          >
-            <LogOut className="w-4 h-4 mr-3" />
-            <span className="text-sm font-medium">Keluar Sistem</span>
-          </Button>
-        </form>
-      </div>
     </div>
   );
 
