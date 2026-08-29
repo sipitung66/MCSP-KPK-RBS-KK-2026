@@ -45,8 +45,11 @@ function validateInput(input: SaveTaggingInput): SaveTaggingInput | null {
 }
 
 export async function getAllTaggingProfiles(): Promise<TaggingProfileRecord[]> {
+  const user = await getCurrentUser();
+  if (!user) return [];
   try {
     const profiles = await prisma.oPDTagProfile.findMany({
+      where: user.role === "ADMIN_OPD" ? { opdName: user.opdName ?? "" } : undefined,
       include: { area: { select: { areaName: true } } },
       orderBy: [{ opdName: "asc" }, { areaId: "asc" }],
     });
@@ -77,33 +80,21 @@ export async function saveTaggingProfile(input: SaveTaggingInput): Promise<{ suc
   }
 
   try {
-    await prisma.oPDTagProfile.upsert({
-      where: { opdName_areaId_assessmentYear_period: { opdName: data.opdName, areaId: data.areaId, assessmentYear: ACTIVE_ASSESSMENT_YEAR, period: ACTIVE_PERIOD } },
-      create: {
-        ...data,
-        hierarchy: data.hierarchy as Prisma.InputJsonValue | undefined,
-        assessmentYear: ACTIVE_ASSESSMENT_YEAR,
-        period: ACTIVE_PERIOD,
-        updatedBy: user.userId,
-      },
-      update: {
-        tags: data.tags,
-        requiredDocs: data.requiredDocs,
-        workpapers: data.workpapers,
-        hierarchy: data.hierarchy as Prisma.InputJsonValue | undefined,
-        assessmentYear: ACTIVE_ASSESSMENT_YEAR,
-        period: ACTIVE_PERIOD,
-        updatedBy: user.userId,
-      },
-    });
-    await prisma.auditLog.create({
-      data: {
-        entityType: "OPDTagProfile",
-        entityId: `${data.opdName}:${data.areaId}:${ACTIVE_ASSESSMENT_YEAR}:${ACTIVE_PERIOD}`,
-        action: "UPSERT",
-        actorId: user.userId,
-        afterData: data.hierarchy as Prisma.InputJsonValue | undefined,
-      },
+    await prisma.$transaction(async (transaction) => {
+      const where = { opdName_areaId_assessmentYear_period: { opdName: data.opdName, areaId: data.areaId, assessmentYear: ACTIVE_ASSESSMENT_YEAR, period: ACTIVE_PERIOD } };
+      const existing = await transaction.oPDTagProfile.findUnique({ where });
+      const saved = await transaction.oPDTagProfile.upsert({
+        where,
+        create: { ...data, hierarchy: data.hierarchy as Prisma.InputJsonValue | undefined, assessmentYear: ACTIVE_ASSESSMENT_YEAR, period: ACTIVE_PERIOD, updatedBy: user.userId },
+        update: { tags: data.tags, requiredDocs: data.requiredDocs, workpapers: data.workpapers, hierarchy: data.hierarchy as Prisma.InputJsonValue | undefined, assessmentYear: ACTIVE_ASSESSMENT_YEAR, period: ACTIVE_PERIOD, updatedBy: user.userId },
+      });
+      await transaction.auditLog.create({
+        data: {
+          entityType: "OPDTagProfile", entityId: saved.id, action: existing ? "UPDATE" : "CREATE", actorId: user.userId,
+          beforeData: existing ? JSON.parse(JSON.stringify(existing)) : undefined,
+          afterData: JSON.parse(JSON.stringify(saved)),
+        },
+      });
     });
     return { success: true };
   } catch (error) {

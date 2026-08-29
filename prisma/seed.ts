@@ -250,10 +250,11 @@ async function main() {
   console.log(`  -> ${OPDS.length} OPD berhasil dibuat.`);
 
   console.log("\n[4/6] Membuat User...");
-  const adminEmail =
-    process.env.DEFAULT_ADMIN_EMAIL || "admin.mcsp@konawekab.go.id";
-  const adminPassword =
-    process.env.DEFAULT_ADMIN_PASSWORD || "AdminMCSP@Konawe2026!";
+  const adminEmail = process.env.DEFAULT_ADMIN_EMAIL;
+  const adminPassword = process.env.DEFAULT_ADMIN_PASSWORD;
+  if (!adminEmail || !adminPassword) {
+    throw new Error("DEFAULT_ADMIN_EMAIL and DEFAULT_ADMIN_PASSWORD must be set before seeding.");
+  }
   const hashedAdminPass = await hash(adminPassword, 10);
 
   await prisma.user.upsert({

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Shield,
+  ShieldCheck,
   LayoutDashboard,
   PieChart,
   Building2,
@@ -39,6 +40,7 @@ const navItemsAdminUtama: NavItem[] = [
   { label: "Rekap Per Area", href: "/dashboard/areas", icon: PieChart },
   { label: "Rekap Per OPD", href: "/dashboard/opds", icon: Building2 },
   { label: "Early Warning", href: "/dashboard/ews", icon: AlertTriangle },
+  { label: "Asesmen Risiko", href: "/dashboard/risk", icon: ShieldCheck },
   { label: "Kelola User OPD", href: "/dashboard/users", icon: Users },
   { label: "Kelola Tagging OPD", href: "/dashboard/tagging", icon: Tags },
 ];

@@ -97,6 +97,9 @@ export async function createOPD(opdName: string): Promise<CreateOPDResult> {
       data: { opdName: normalizedName },
       select: { id: true, opdName: true, createdAt: true },
     });
+    await prisma.auditLog.create({
+      data: { entityType: "OPDList", entityId: String(created.id), action: "CREATE", actorId: user.userId, afterData: created },
+    });
     return { success: true, opd: created };
   } catch (dbError) {
     const message = dbError instanceof Error ? dbError.message : String(dbError);
@@ -137,6 +140,9 @@ export async function createUserOPD(
         createdAt: true,
       },
     });
+    await prisma.auditLog.create({
+      data: { entityType: "User", entityId: created.id, action: "CREATE", actorId: currentUser.userId, afterData: created },
+    });
 
     return { success: true, user: created };
   } catch (dbError) {
@@ -146,6 +152,8 @@ export async function createUserOPD(
 }
 
 export async function getAllUsers(): Promise<PublicUser[]> {
+  const currentUser = await getCurrentUser();
+  if (!currentUser || currentUser.role !== "ADMIN_UTAMA") return [];
   try {
     const users = await prisma.user.findMany({
       select: {
@@ -172,7 +180,14 @@ export async function deleteUser(userId: string): Promise<DeleteUserResult> {
   }
 
   try {
-    await prisma.user.delete({ where: { id: userId } });
+    const existing = await prisma.user.findUnique({ where: { id: userId } });
+    if (!existing) return { success: false, error: "User tidak ditemukan." };
+    await prisma.$transaction(async (transaction) => {
+      await transaction.user.delete({ where: { id: userId } });
+      await transaction.auditLog.create({
+        data: { entityType: "User", entityId: userId, action: "DELETE", actorId: currentUser.userId, beforeData: existing },
+      });
+    });
     return { success: true };
   } catch (dbError) {
     console.error("[users.actions.ts] deleteUser DB error:", dbError);
@@ -187,10 +202,15 @@ export async function deleteOPD(opdName: string): Promise<DeleteOPDResult> {
 
   try {
     await prisma.$transaction(async (transaction) => {
+      const existing = await transaction.oPDList.findUnique({ where: { opdName } });
+      if (!existing) throw new Error("OPD_NOT_FOUND");
       await transaction.user.deleteMany({ where: { opdName } });
       await transaction.submission.deleteMany({ where: { opdName } });
       await transaction.oPDTagProfile.deleteMany({ where: { opdName } });
       await transaction.oPDList.delete({ where: { opdName } });
+      await transaction.auditLog.create({
+        data: { entityType: "OPDList", entityId: String(existing.id), action: "DELETE", actorId: currentUser.userId, beforeData: existing },
+      });
     });
     return { success: true };
   } catch (dbError) {

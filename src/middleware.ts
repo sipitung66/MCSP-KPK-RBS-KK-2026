@@ -12,7 +12,7 @@ interface SessionPayload extends JWTPayload {
 function getAuthSecret(): Uint8Array {
   const secret = process.env.AUTH_SECRET;
   if (!secret) {
-    return new TextEncoder().encode("fallback-secret-change-me-production-only-used-if-env-missing");
+    throw new Error("AUTH_SECRET environment variable is not set");
   }
   return new TextEncoder().encode(secret);
 }

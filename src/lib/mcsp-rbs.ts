@@ -36,6 +36,16 @@ export interface OPDTagProfile {
   hierarchy?: Record<number, TaggingHierarchy>;
 }
 
+export const MCSP_AREA_OPTIONS = [
+  { id: 1, areaName: "Perencanaan dan Penganggaran APBD" },
+  { id: 2, areaName: "Pengadaan Barang dan Jasa (PBJ)" },
+  { id: 3, areaName: "Pelayanan Publik" },
+  { id: 4, areaName: "Manajemen ASN" },
+  { id: 5, areaName: "Pengelolaan Barang Milik Daerah (BMD)" },
+  { id: 6, areaName: "Optimalisasi Pendapatan Daerah" },
+  { id: 7, areaName: "Penguatan APIP" },
+] as const;
+
 export type OPDTaggingOverrides = Record<string, OPDTagProfile>;
 
 export interface OPDComplianceSnapshot {
@@ -397,7 +407,7 @@ export function getAreaHierarchy(opdName: string, areaId: number, overrides?: OP
 
 export function getOPDComplianceSnapshot(
   opdName: string,
-  submissions: Array<{ areaId: number; documentName?: string; status?: string }>,
+  submissions: Array<{ areaId: number; documentName?: string; status?: string; verificationStatus?: string }>,
   overrides?: OPDTaggingOverrides
 ): OPDComplianceSnapshot {
   const profile = getOPDTagProfile(opdName, overrides);
@@ -410,7 +420,7 @@ export function getOPDComplianceSnapshot(
         (submission) =>
           submission.areaId === areaRequirement.areaId &&
           normalizeName(submission.documentName ?? "") === normalizeName(docName) &&
-          submission.status === "TERPENUHI"
+          submission.status === "TERPENUHI" && submission.verificationStatus === "DIVERIFIKASI"
       )
     );
 
@@ -418,7 +428,7 @@ export function getOPDComplianceSnapshot(
       submissions.some(
         (submission) =>
           submission.areaId === areaRequirement.areaId &&
-          submission.status === "TERPENUHI" &&
+          submission.status === "TERPENUHI" && submission.verificationStatus === "DIVERIFIKASI" &&
           (
             normalizeName(submission.documentName ?? "") === normalizeName(workpaper) ||
             normalizeName(submission.documentName ?? "").includes(normalizeName(workpaper)) ||

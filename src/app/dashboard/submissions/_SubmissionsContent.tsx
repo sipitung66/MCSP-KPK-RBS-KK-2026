@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import {
-  Upload,
+  Link,
   Save,
   FileText,
   CheckCircle2,
@@ -43,6 +43,7 @@ import { cn } from "@/lib/utils";
 import { getSubmissionsByOPD, upsertSubmission, verifySubmission } from "@/lib/actions/submissions.actions";
 import { formatMCSPFileLabel, formatMCSPHierarchyLabel } from "@/lib/mcsp-workpapers";
 import {
+  MCSP_AREA_OPTIONS,
   getAreaRequiredDocumentNames,
   getAreaRequiredWorkpapers,
   getAreaHierarchy,
@@ -77,6 +78,14 @@ interface SubmissionsContentProps {
 }
 
 export function SubmissionsContent({ user, areas, opds, initialSubmissions, taggingOverrides }: SubmissionsContentProps) {
+  const fallbackAreas = MCSP_AREA_OPTIONS.map((area) => ({
+    id: area.id,
+    areaName: area.areaName,
+    targetDocs: 0,
+    description: null,
+    createdAt: new Date(),
+  } as MCSPArea));
+  const areaOptions = areas.length > 0 ? areas : fallbackAreas;
   const [submissions, setSubmissions] = useState<Submission[]>(initialSubmissions);
   const [saving, setSaving] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
@@ -89,8 +98,6 @@ export function SubmissionsContent({ user, areas, opds, initialSubmissions, tagg
   const [selectedWorkpaper, setSelectedWorkpaper] = useState<string>("");
   const [selectedObjective, setSelectedObjective] = useState<string>("");
   const [selectedIndicator, setSelectedIndicator] = useState<string>("");
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [uploading, setUploading] = useState(false);
   const [status, setStatus] = useState<DocStatus>("TERPENUHI");
   const [fileUrl, setFileUrl] = useState("");
   const [workpaperUrl, setWorkpaperUrl] = useState("");
@@ -158,45 +165,23 @@ export function SubmissionsContent({ user, areas, opds, initialSubmissions, tagg
       });
       return;
     }
-    if (selectedFile && selectedFile.size > 100 * 1024 * 1024) {
-      toast({ title: "File terlalu besar", description: "Ukuran maksimal setiap file adalah 100 MB.", variant: "destructive" });
-      return;
-    }
     setSaving("form");
     try {
-      let uploadedUrl = evidenceType === "DOKUMEN" ? fileUrl : workpaperUrl;
-      if (selectedFile) {
-        setUploading(true);
-        const formData = new FormData();
-        formData.append("file", selectedFile);
-        const selectedOptions = evidenceType === "DOKUMEN" ? hierarchicalDocuments : hierarchicalWorkpapers;
-        const selectedOptionIndex = selectedOptions.findIndex((item) => item.label === selectedEvidence);
-        const objectiveNumber = hierarchy.objectives.findIndex((item) => item.id === objective?.id) + 1;
-        const indicatorNumber = objective?.indicators.findIndex((item) => item.id === indicator?.id) + 1;
-        const itemPrefix = selectedOptionIndex >= 0
-          ? `${selectedArea}.${objectiveNumber}.${indicatorNumber}.${selectedOptionIndex + 1}`
-          : selectedEvidence;
-        formData.append("fileLabel", formatMCSPFileLabel(selectedEvidence, itemPrefix));
-        const uploadResponse = await fetch("/api/uploads", { method: "POST", body: formData });
-        const uploadResult = await uploadResponse.json() as { success?: boolean; url?: string; error?: string };
-        if (!uploadResponse.ok || !uploadResult.success || !uploadResult.url) throw new Error(uploadResult.error ?? "Upload file gagal.");
-        uploadedUrl = uploadResult.url;
-      }
       const result = await upsertSubmission(
         targetOpd,
         Number(selectedArea),
         selectedEvidence,
         status,
-        evidenceType === "DOKUMEN" ? uploadedUrl || undefined : undefined,
+        evidenceType === "DOKUMEN" ? fileUrl || undefined : undefined,
         note || undefined,
-        evidenceType === "KERTAS_KERJA" ? uploadedUrl || undefined : undefined
+        evidenceType === "KERTAS_KERJA" ? workpaperUrl || undefined : undefined
       );
       if (result.success) {
         toast({
           title: "Berhasil Disimpan",
           description: `Data "${selectedEvidence}" berhasil diperbarui.`,
         });
-        setSelectedDoc(""); setSelectedWorkpaper(""); setSelectedObjective(""); setSelectedIndicator(""); setSelectedFile(null); setFileUrl(""); setWorkpaperUrl(""); setNote(""); setStatus("TERPENUHI");
+        setSelectedDoc(""); setSelectedWorkpaper(""); setSelectedObjective(""); setSelectedIndicator(""); setFileUrl(""); setWorkpaperUrl(""); setNote(""); setStatus("TERPENUHI");
         await refreshSubmissions();
       } else {
         toast({
@@ -206,7 +191,6 @@ export function SubmissionsContent({ user, areas, opds, initialSubmissions, tagg
         });
       }
     } finally {
-      setUploading(false);
       setSaving(null);
     }
   };
@@ -338,7 +322,7 @@ export function SubmissionsContent({ user, areas, opds, initialSubmissions, tagg
                                   (submission) =>
                                     submission.areaId === group.areaId &&
                                     submission.documentName === doc &&
-                                    submission.status === "TERPENUHI"
+                                    submission.status === "TERPENUHI" && submission.verificationStatus === "DIVERIFIKASI"
                                 )
                                   ? "success"
                                   : "secondary"
@@ -349,7 +333,7 @@ export function SubmissionsContent({ user, areas, opds, initialSubmissions, tagg
                                   (submission) =>
                                     submission.areaId === group.areaId &&
                                     submission.documentName === doc &&
-                                    submission.status === "TERPENUHI"
+                                    submission.status === "TERPENUHI" && submission.verificationStatus === "DIVERIFIKASI"
                                 )
                                   ? "bg-emerald-100 text-emerald-800"
                                   : "bg-slate-100 text-slate-700"
@@ -372,7 +356,7 @@ export function SubmissionsContent({ user, areas, opds, initialSubmissions, tagg
                                   submissions.some(
                                     (submission) =>
                                       submission.areaId === group.areaId &&
-                                      submission.status === "TERPENUHI" &&
+                                      submission.status === "TERPENUHI" && submission.verificationStatus === "DIVERIFIKASI" &&
                                       (
                                         submission.documentName === paper ||
                                         submission.documentName.toLowerCase().includes(paper.toLowerCase()) ||
@@ -387,7 +371,7 @@ export function SubmissionsContent({ user, areas, opds, initialSubmissions, tagg
                                   submissions.some(
                                     (submission) =>
                                       submission.areaId === group.areaId &&
-                                      submission.status === "TERPENUHI" &&
+                                      submission.status === "TERPENUHI" && submission.verificationStatus === "DIVERIFIKASI" &&
                                       (
                                         submission.documentName === paper ||
                                         submission.documentName.toLowerCase().includes(paper.toLowerCase()) ||
@@ -473,7 +457,7 @@ export function SubmissionsContent({ user, areas, opds, initialSubmissions, tagg
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="grid grid-cols-2 sm:inline-flex h-auto p-1 bg-slate-100 mb-4">
           <TabsTrigger value="unggah" className="px-4 py-2 text-sm data-[state=active]:bg-white rounded-md gap-1.5">
-            <Upload className="w-4 h-4" /> Unggah / Perbarui Dokumen
+            <Link className="w-4 h-4" /> Simpan / Perbarui URL Bukti
           </TabsTrigger>
           <TabsTrigger value="daftar" className="px-4 py-2 text-sm data-[state=active]:bg-white rounded-md gap-1.5">
             <FileText className="w-4 h-4" /> Daftar Seluruh Dokumen
@@ -484,8 +468,8 @@ export function SubmissionsContent({ user, areas, opds, initialSubmissions, tagg
           <Card className="border-slate-200 shadow-sm">
             <CardHeader className="px-5 sm:px-6 py-4 border-b border-slate-100 bg-gradient-to-br from-indigo-50 to-white">
               <CardTitle className="text-base font-bold flex items-center gap-2">
-                <Upload className="w-5 h-5 text-indigo-600" />
-                Form Unggah Dokumen Bukti Dukung
+                <Link className="w-5 h-5 text-indigo-600" />
+                Form URL Bukti Dukung
               </CardTitle>
               <CardDescription className="text-xs text-slate-500 mt-0.5">
                 Isi data dokumen yang telah dipenuhi
@@ -504,7 +488,7 @@ export function SubmissionsContent({ user, areas, opds, initialSubmissions, tagg
                     >
                       <SelectTrigger><SelectValue placeholder="Pilih Area..." /></SelectTrigger>
                       <SelectContent>
-                        {areas.map((a) => (
+                        {areaOptions.map((a) => (
                           <SelectItem key={a.id} value={String(a.id)}>{a.areaName}</SelectItem>
                         ))}
                       </SelectContent>
@@ -554,11 +538,6 @@ export function SubmissionsContent({ user, areas, opds, initialSubmissions, tagg
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-sm font-semibold">Upload file (maksimal 100 MB)</Label>
-                    <Input type="file" onChange={(event) => setSelectedFile(event.target.files?.[0] ?? null)} />
-                    <p className="text-[11px] text-slate-500">Pilih file bukti atau gunakan URL di samping.</p>
-                  </div>
-                  <div className="space-y-2">
                     <Label className="text-sm font-semibold">Status Pemenuhan</Label>
                     <Select value={status} onValueChange={(v) => setStatus(v as DocStatus)}>
                       <SelectTrigger><SelectValue /></SelectTrigger>
@@ -569,24 +548,24 @@ export function SubmissionsContent({ user, areas, opds, initialSubmissions, tagg
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-sm font-semibold">{evidenceType === "DOKUMEN" ? "URL File Dokumen" : "URL Kertas Kerja"}</Label>
+                    <Label className="text-sm font-semibold">URL Google Drive Dokumen</Label>
                     <Input
                       type="url"
                       placeholder="https://drive.google.com/..."
                       value={evidenceType === "DOKUMEN" ? fileUrl : workpaperUrl}
                       onChange={(e) => evidenceType === "DOKUMEN" ? setFileUrl(e.target.value) : setWorkpaperUrl(e.target.value)}
                     />
-                    <p className="text-[11px] text-slate-500">URL {evidenceType === "DOKUMEN" ? "file dokumen" : "file kertas kerja"} yang diunggah OPD.</p>
+                    <p className="text-[11px] text-slate-500">Tempel URL Google Drive/Docs dokumen yang dapat diperiksa.</p>
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-sm font-semibold">URL Kertas Kerja</Label>
+                    <Label className="text-sm font-semibold">URL Google Drive Kertas Kerja</Label>
                     <Input
                       type="url"
                       placeholder="https://drive.google.com/..."
                       value={workpaperUrl}
                       onChange={(e) => setWorkpaperUrl(e.target.value)}
                     />
-                    <p className="text-[11px] text-violet-600">Wajib diisi bila area ini memiliki kertas kerja.</p>
+                    <p className="text-[11px] text-violet-600">Tempel URL Google Drive/Docs kertas kerja bila tersedia.</p>
                   </div>
                 </div>
 
@@ -685,7 +664,7 @@ export function SubmissionsContent({ user, areas, opds, initialSubmissions, tagg
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Semua Area</SelectItem>
-                    {areas.map((a) => (
+                    {areaOptions.map((a) => (
                       <SelectItem key={a.id} value={String(a.id)}>{a.areaName}</SelectItem>
                     ))}
                   </SelectContent>
@@ -713,7 +692,7 @@ export function SubmissionsContent({ user, areas, opds, initialSubmissions, tagg
                 </div>
               ) : (
                 <div className="space-y-0">
-                  {areas.map((area) => {
+                  {areaOptions.map((area) => {
                     const areaSubs = filteredSubmissions.filter((s) => s.areaId === area.id);
                     if (areaSubs.length === 0) return null;
                     const isExpanded = expandedAreas[area.id] ?? true;

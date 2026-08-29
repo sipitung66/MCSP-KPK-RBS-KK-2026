@@ -10,15 +10,14 @@ export default async function TaggingPage() {
   if (!user) redirect("/login");
   if (user.role !== "ADMIN_UTAMA") redirect("/dashboard");
 
-  const [opds, areas, profiles] = await Promise.all([
+  const [opds, profiles] = await Promise.all([
     getAllOPDList(),
-    getAllAreas(),
     getAllTaggingProfiles(),
   ]);
 
   return (
     <AppShell title="Kelola Tagging OPD" subtitle="Atur kewajiban dokumen dan kertas kerja per OPD dan area">
-      <TaggingContent opds={opds} areas={areas} initialProfiles={profiles} />
+      <TaggingContent opds={opds} initialProfiles={profiles} />
     </AppShell>
   );
 }

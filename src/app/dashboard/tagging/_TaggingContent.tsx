@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { CheckCircle2, ChevronDown, Edit3, ListChecks, Loader2, Plus, Save, Tags, Trash2 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { CheckCircle2, ChevronDown, Edit3, ListChecks, Loader2, Plus, Save, Search, Tags, Trash2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -11,21 +11,29 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "@/components/ui/use-toast";
-import { getAreaHierarchy, getOPDTagProfile, type TaggingHierarchy, type TaggingOption } from "@/lib/mcsp-rbs";
+import { MCSP_AREA_OPTIONS, getAreaHierarchy, getOPDTagProfile, type TaggingHierarchy, type TaggingOption } from "@/lib/mcsp-rbs";
 import { formatMCSPFileLabel, formatMCSPHierarchyLabel, getMCSPWorkpaperOptions } from "@/lib/mcsp-workpapers";
 import { deleteTaggingProfile, saveTaggingProfile, type TaggingProfileRecord } from "@/lib/actions/tagging.actions";
 import type { MCSPArea, OPDList } from "@prisma/client";
 
 interface TaggingContentProps {
   opds: OPDList[];
-  areas: MCSPArea[];
+  areas?: MCSPArea[];
   initialProfiles: TaggingProfileRecord[];
 }
 
 export function TaggingContent({ opds, areas, initialProfiles }: TaggingContentProps) {
+  const fixedAreas = MCSP_AREA_OPTIONS.map((area) => ({
+    id: area.id,
+    areaName: area.areaName,
+    targetDocs: 0,
+    description: null,
+    createdAt: new Date(),
+  } as MCSPArea));
+  const areaOptions = areas && areas.length > 0 ? areas : fixedAreas;
   const [profiles, setProfiles] = useState(initialProfiles);
   const initialOpdName = opds[0]?.opdName ?? "";
-  const initialAreaId = String(areas[0]?.id ?? "");
+  const initialAreaId = String(areaOptions[0]?.id ?? 1);
   const initialHierarchy: TaggingHierarchy = { objectives: [] };
   const [opdName, setOpdName] = useState(initialOpdName);
   const [areaId, setAreaId] = useState(initialAreaId);
@@ -40,6 +48,8 @@ export function TaggingContent({ opds, areas, initialProfiles }: TaggingContentP
   const [addDialog, setAddDialog] = useState<"objective" | "indicator" | "documents" | "workpapers" | null>(null);
   const [newLabel, setNewLabel] = useState("");
   const [newScore, setNewScore] = useState("");
+  const [documentSearch, setDocumentSearch] = useState("");
+  const [workpaperSearch, setWorkpaperSearch] = useState("");
 
   const selectedProfile = profiles.find((profile) => profile.opdName === opdName && profile.areaId === Number(areaId));
 
@@ -78,8 +88,18 @@ export function TaggingContent({ opds, areas, initialProfiles }: TaggingContentP
     loadForm(opdName, value);
   };
 
+  const isFormValid = Boolean(opdName.trim() && areaId && Number(areaId) > 0);
+
   const handleSave = async (event: React.FormEvent) => {
     event.preventDefault();
+    if (!isFormValid) {
+      toast({
+        title: "Data belum lengkap",
+        description: "Pilih OPD dan Area MCSP terlebih dahulu sebelum menyimpan.",
+        variant: "destructive",
+      });
+      return;
+    }
     setSaving(true);
     const hierarchyDocuments = hierarchy.objectives.flatMap((objective) => objective.indicators.flatMap((indicator) => indicator.documents.map((item) => item.label)));
     const hierarchyWorkpapers = hierarchy.objectives.flatMap((objective) => objective.indicators.flatMap((indicator) => indicator.workpapers.map((item) => item.label)));
@@ -92,7 +112,7 @@ export function TaggingContent({ opds, areas, initialProfiles }: TaggingContentP
       hierarchy: { [Number(areaId)]: hierarchy },
     });
     if (result.success) {
-      const area = areas.find((item) => item.id === Number(areaId));
+      const area = areaOptions.find((item) => item.id === Number(areaId));
       const nextProfile: TaggingProfileRecord = {
         id: selectedProfile?.id ?? `local-${Date.now()}`,
         opdName,
@@ -134,6 +154,8 @@ export function TaggingContent({ opds, areas, initialProfiles }: TaggingContentP
     ...getMCSPWorkpaperOptions(Number(areaId), selectedIndicatorOptionNumber).map((label, index) => ({ id: `workpaper-${areaId}-${selectedIndicatorOptionNumber}-${index}`, label })),
     ...getMCSPWorkpaperOptions(Number(areaId), selectedIndicatorOptionNumber).map((label, index) => ({ id: `workpaper-${areaId}-${selectedIndicatorOptionNumber}-${index}`, label })),
   ].map((option) => [option.label, option])).values());
+  const filteredDocumentOptions = useMemo(() => documentChoiceOptions.filter((option) => option.label.toLowerCase().includes(documentSearch.toLowerCase().trim())), [documentChoiceOptions, documentSearch]);
+  const filteredWorkpaperOptions = useMemo(() => workpaperChoiceOptions.filter((option) => option.label.toLowerCase().includes(workpaperSearch.toLowerCase().trim())), [workpaperChoiceOptions, workpaperSearch]);
   const toggleHierarchyOption = (kind: "documents" | "workpapers", option: TaggingOption) => {
     setHierarchyTouched(true);
     setHierarchy((current) => ({
@@ -236,7 +258,7 @@ export function TaggingContent({ opds, areas, initialProfiles }: TaggingContentP
         <CardContent className="p-5">
           <form onSubmit={handleSave} className="space-y-5">
             <div className="space-y-2"><Label>OPD</Label><Select value={opdName} onValueChange={handleOpdChange}><SelectTrigger><SelectValue placeholder="Pilih OPD" /></SelectTrigger><SelectContent>{opds.map((opd) => <SelectItem key={opd.id} value={opd.opdName}>{opd.opdName}</SelectItem>)}</SelectContent></Select></div>
-            <div className="space-y-2"><Label>Area MCSP</Label><Select value={areaId} onValueChange={handleAreaChange}><SelectTrigger><SelectValue placeholder="Pilih area" /></SelectTrigger><SelectContent>{areas.map((area) => <SelectItem key={area.id} value={String(area.id)}>{area.id}. {area.areaName}</SelectItem>)}</SelectContent></Select></div>
+            <div className="space-y-2"><Label>Area MCSP</Label><Select value={areaId} onValueChange={handleAreaChange}><SelectTrigger><SelectValue placeholder="Pilih area" /></SelectTrigger><SelectContent>{areaOptions.map((area) => <SelectItem key={area.id} value={String(area.id)}>{area.id}. {area.areaName}</SelectItem>)}</SelectContent></Select></div>
             <div className="space-y-4 rounded-lg border border-teal-200 bg-teal-50/60 p-4">
               <div><Label>Hierarki pilihan</Label><p className="mt-1 text-xs text-slate-600">Pilih tujuan dan indikator, lalu centang dokumen atau KK yang berlaku. Tombol tambah dipakai untuk membuat opsi baru.</p></div>
               <div className="space-y-1"><Label className="text-xs text-slate-600">Tujuan Pencegahan Korupsi</Label><p className="text-[11px] text-slate-500">Pilih tujuan yang menjadi dasar tagging OPD.</p><div className="flex gap-2"><Select value={selectedObjective?.id ?? ""} onValueChange={(value) => { setSelectedObjectiveId(value); setSelectedIndicatorId(""); setHierarchyTouched(true); }}><SelectTrigger className="flex-1"><SelectValue placeholder="Pilih tujuan pencegahan korupsi" /></SelectTrigger>
@@ -247,19 +269,29 @@ export function TaggingContent({ opds, areas, initialProfiles }: TaggingContentP
               <div className="grid gap-3 md:grid-cols-2">
                 <div className="space-y-1"><Label className="text-xs text-slate-600">Dokumen</Label><p className="text-[11px] text-slate-500">Pilih satu atau lebih dokumen.</p><DropdownMenu>
                   <DropdownMenuTrigger asChild><Button type="button" variant="outline" className="w-full justify-between bg-white">Dokumen ({selectedIndicator?.documents.length ?? 0} dipilih)<ChevronDown className="h-4 w-4" /></Button></DropdownMenuTrigger>
-                  <DropdownMenuContent className="max-h-72 w-[--radix-dropdown-menu-trigger-width] overflow-y-auto">
-                    {documentChoiceOptions.map((option, index) => <DropdownMenuCheckboxItem key={option.id} checked={selectedIndicator?.documents.some((item) => item.label === option.label)} onSelect={(event) => event.preventDefault()} onCheckedChange={() => toggleHierarchyOption("documents", option)}>{formatMCSPFileLabel(option.label, `${areaId}.${selectedObjectiveNumber}.${selectedIndicatorNumber}.${index + 1}`)}</DropdownMenuCheckboxItem>)}
-                                      {workpaperChoiceOptions.map((option, index) => <DropdownMenuCheckboxItem key={option.id} checked={selectedIndicator?.workpapers.some((item) => item.label === option.label)} onSelect={(event) => event.preventDefault()} onCheckedChange={() => toggleHierarchyOption("workpapers", option)}>{formatMCSPFileLabel(option.label, `${areaId}.${selectedObjectiveNumber}.${selectedIndicatorNumber}.${index + 1}`)}</DropdownMenuCheckboxItem>)}
+                  <DropdownMenuContent className="w-[--radix-dropdown-menu-trigger-width] p-1">
+                    <div className="border-b border-slate-200 p-2" onKeyDown={(event) => event.stopPropagation()}>
+                      <div className="relative"><Search className="pointer-events-none absolute left-2 top-2.5 h-4 w-4 text-slate-400" /><Input value={documentSearch} onChange={(event) => setDocumentSearch(event.target.value)} placeholder="Cari dokumen..." className="h-9 pl-8" /></div>
+                    </div>
+                    <div className="max-h-60 overflow-y-auto py-1">
+                      {filteredDocumentOptions.length === 0 ? <p className="px-3 py-4 text-center text-xs text-slate-500">Dokumen tidak ditemukan.</p> : filteredDocumentOptions.map((option) => { const index = documentChoiceOptions.findIndex((item) => item.id === option.id); return <DropdownMenuCheckboxItem key={option.id} checked={selectedIndicator?.documents.some((item) => item.label === option.label)} onSelect={(event) => event.preventDefault()} onCheckedChange={() => toggleHierarchyOption("documents", option)}>{formatMCSPFileLabel(option.label, `${areaId}.${selectedObjectiveNumber}.${selectedIndicatorNumber}.${index + 1}`)}</DropdownMenuCheckboxItem>; })}
+                    </div>
                   </DropdownMenuContent>
                 </DropdownMenu><div className="flex gap-1"><Button type="button" size="icon" variant="outline" title="Tambah dokumen" onClick={() => addHierarchyNode("documents")}><Plus /></Button>{hierarchyTouched && selectedIndicator?.documents.map((option) => <Button key={option.id} type="button" size="icon" variant="ghost" title={`Hapus ${option.label}`} onClick={() => deleteHierarchyNode("documents", option.id)}><Trash2 className="h-3.5 w-3.5 text-rose-600" /></Button>)}</div></div>
                 <div className="space-y-1"><Label className="text-xs text-slate-600">Kertas Kerja</Label><p className="text-[11px] text-slate-500">Pilih KK dan bobot penilaiannya.</p><DropdownMenu>
                   <DropdownMenuTrigger asChild><Button type="button" variant="outline" className="w-full justify-between bg-white">KK ({selectedIndicator?.workpapers.length ?? 0} dipilih)<ChevronDown className="h-4 w-4" /></Button></DropdownMenuTrigger>
-                  <DropdownMenuContent className="max-h-72 w-[--radix-dropdown-menu-trigger-width] overflow-y-auto">
+                  <DropdownMenuContent className="w-[--radix-dropdown-menu-trigger-width] p-1">
+                    <div className="border-b border-slate-200 p-2" onKeyDown={(event) => event.stopPropagation()}>
+                      <div className="relative"><Search className="pointer-events-none absolute left-2 top-2.5 h-4 w-4 text-slate-400" /><Input value={workpaperSearch} onChange={(event) => setWorkpaperSearch(event.target.value)} placeholder="Cari kertas kerja..." className="h-9 pl-8" /></div>
+                    </div>
+                    <div className="max-h-60 overflow-y-auto py-1">
+                      {filteredWorkpaperOptions.length === 0 ? <p className="px-3 py-4 text-center text-xs text-slate-500">Kertas kerja tidak ditemukan.</p> : filteredWorkpaperOptions.map((option) => { const index = workpaperChoiceOptions.findIndex((item) => item.id === option.id); return <DropdownMenuCheckboxItem key={option.id} checked={selectedIndicator?.workpapers.some((item) => item.label === option.label)} onSelect={(event) => event.preventDefault()} onCheckedChange={() => toggleHierarchyOption("workpapers", option)}>{formatMCSPFileLabel(option.label, `${areaId}.${selectedObjectiveNumber}.${selectedIndicatorNumber}.${index + 1}`)}</DropdownMenuCheckboxItem>; })}
+                    </div>
                   </DropdownMenuContent>
                 </DropdownMenu><div className="flex gap-1"><Button type="button" size="icon" variant="outline" title="Tambah KK" onClick={() => addHierarchyNode("workpapers")}><Plus /></Button>{hierarchyTouched && selectedIndicator?.workpapers.map((option) => <Button key={option.id} type="button" size="icon" variant="ghost" title={`Hapus ${option.label}`} onClick={() => deleteHierarchyNode("workpapers", option.id)}><Trash2 className="h-3.5 w-3.5 text-rose-600" /></Button>)}</div></div>
               </div>
             </div>
-            <Button type="submit" disabled={saving || !opdName || !areaId} className="w-full bg-teal-700 hover:bg-teal-800"><Save /> {saving ? "Menyimpan..." : selectedProfile ? "Perbarui Tagging" : "Simpan Tagging"}</Button>
+            <Button type="submit" disabled={saving || !isFormValid} className="w-full bg-teal-700 hover:bg-teal-800"><Save /> {saving ? "Menyimpan..." : selectedProfile ? "Perbarui Tagging" : "Simpan Tagging"}</Button>
           </form>
         </CardContent>
       </Card>

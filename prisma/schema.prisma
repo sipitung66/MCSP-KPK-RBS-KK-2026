@@ -148,6 +148,12 @@ enum VerificationStatus {
   DITOLAK
 }
 
+enum RiskLevel {
+  RENDAH
+  SEDANG
+  TINGGI
+}
+
 model AuditLog {
   id           String   @id @default(uuid())
   entityType   String
@@ -162,4 +168,32 @@ model AuditLog {
   @@index([entityType, entityId])
   @@index([createdAt])
   @@map("audit_logs")
+}
+
+model RiskAssessment {
+  id               String    @id @default(uuid())
+  opdName          String
+  areaId           Int
+  indicatorId      String
+  assessmentYear   Int       @default(2026)
+  period           String    @default("TAHUNAN")
+  completenessScore Float?
+  riskScore        Float?
+  riskLevel        RiskLevel?
+  analysis         String?
+  redFlags         String[]
+  controlWeakness  String?
+  impact           String?
+  mitigation       String?
+  assessedBy       String?
+  assessedAt       DateTime?
+  qaStatus         String    @default("BELUM_REVIEW")
+  qaBy             String?
+  qaAt             DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@unique([opdName, indicatorId, assessmentYear, period])
+  @@index([areaId, riskLevel])
+  @@map("risk_assessments")
 }

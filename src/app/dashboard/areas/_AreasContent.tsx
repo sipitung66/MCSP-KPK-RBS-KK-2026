@@ -32,6 +32,7 @@ import {
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import { getSubmissionsByArea } from "@/lib/actions/submissions.actions";
+import { MCSP_AREA_OPTIONS } from "@/lib/mcsp-rbs";
 import type { MCSPArea, Submission, DocStatus } from "@prisma/client";
 import type { DashboardSummary } from "@/lib/actions/dashboard.actions";
 import { ProgressGauge } from "@/components/charts/ProgressGauge";
@@ -44,8 +45,16 @@ interface AreasContentProps {
 }
 
 export function AreasContent({ areas, summary }: AreasContentProps) {
-  const [selectedArea, setSelectedArea] = useState<number | "all">(areas[0]?.id ?? "all");
-  const [expandedArea, setExpandedArea] = useState<number | "all">(areas[0]?.id ?? "all");
+  const fallbackAreas = MCSP_AREA_OPTIONS.map((area) => ({
+    id: area.id,
+    areaName: area.areaName,
+    targetDocs: 0,
+    description: null,
+    createdAt: new Date(),
+  } as MCSPArea));
+  const areaOptions = areas.length > 0 ? areas : fallbackAreas;
+  const [selectedArea, setSelectedArea] = useState<number | "all">(areaOptions[0]?.id ?? "all");
+  const [expandedArea, setExpandedArea] = useState<number | "all">(areaOptions[0]?.id ?? "all");
   const [areaSubmissions, setAreaSubmissions] = useState<Submission[]>([]);
   const [searchOPD, setSearchOPD] = useState("");
   const [filterStatus, setFilterStatus] = useState<"all" | DocStatus>("all");
@@ -132,9 +141,9 @@ export function AreasContent({ areas, summary }: AreasContentProps) {
               <CardTitle className="text-base font-bold text-slate-800 flex items-center gap-2">
                 <FileText className="w-5 h-5 text-slate-700" />
                 Rincian Dokumen Per OPD
-                {selectedArea !== "all" && areas.find((a) => a.id === selectedArea) && (
+                {selectedArea !== "all" && areaOptions.find((a) => a.id === selectedArea) && (
                   <Badge variant="outline" className="ml-2 bg-indigo-50 text-indigo-700 border-indigo-200">
-                    Area {selectedArea}: {areas.find((a) => a.id === selectedArea)?.areaName}
+                    Area {selectedArea}: {areaOptions.find((a) => a.id === selectedArea)?.areaName}
                   </Badge>
                 )}
               </CardTitle>
@@ -152,7 +161,7 @@ export function AreasContent({ areas, summary }: AreasContentProps) {
                   <SelectValue placeholder="Pilih Area..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {areas.map((a) => (
+                  {areaOptions.map((a) => (
                     <SelectItem key={a.id} value={String(a.id)}>
                       Area {a.id}: {a.areaName}
                     </SelectItem>

@@ -7,113 +7,26 @@ import type { DocStatus, Submission, VerificationStatus } from "@prisma/client";
 const ACTIVE_ASSESSMENT_YEAR = 2026;
 const ACTIVE_PERIOD = "TAHUNAN";
 
+function isGoogleEvidenceUrl(url?: string): boolean {
+  if (!url) return false;
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === "https:" && [
+      "drive.google.com",
+      "docs.google.com",
+      "sheets.google.com",
+      "slides.google.com",
+    ].includes(parsed.hostname.toLowerCase());
+  } catch {
+    return false;
+  }
+}
+
 interface UpsertSubmissionResult {
   success: boolean;
   submission?: Submission;
   error?: string;
 }
-
-const MOCK_OPD_NAMES: string[] = [
-  "Badan Kepegawaian dan Pengembangan Sumber Daya Manusia",
-  "Badan Pengelolaan Keuangan dan Aset Daerah",
-  "Dinas Pekerjaan Umum dan Perumahan Rakyat",
-  "Dinas Pendidikan dan Kebudayaan",
-  "Dinas Kesehatan",
-  "Dinas Sosial",
-  "Dinas Perhubungan",
-  "Dinas Lingkungan Hidup",
-  "Dinas Pertanian dan Ketahanan Pangan",
-  "Dinas Perindustrian dan Perdagangan",
-  "Dinas Komunikasi dan Informatika",
-  "Dinas Penanaman Modal dan Pelayanan Terpadu Satu Pintu",
-  "Dinas Pariwisata",
-  "Dinas Pertanahan dan Tata Ruang",
-  "Inspektorat Daerah",
-];
-
-const MOCK_DOCUMENTS_PER_AREA: Record<number, string[]> = {
-  1: [
-    "Dokumen Perencanaan Strategis (Renstra)",
-    "Dokumen Rencana Kinerja Tahunan (RKT)",
-    "Dokumen Rencana Aksi Pencegahan Korupsi (RAKK)",
-    "Laporan Kinerja Tahunan",
-    "Dokumen Analisis Jabatan",
-  ],
-  2: [
-    "SOP Pengelolaan Keuangan",
-    "Laporan Realisasi Anggaran",
-    "Dokumen Pertanggungjawaban Keuangan",
-  ],
-  3: [
-    "Dokumen Perencanaan Pengadaan",
-    "SOP Pengadaan Barang/Jasa",
-    "Laporan Pelaksanaan Pengadaan",
-    "Dokumen Kontrak Pengadaan",
-    "Laporan Hasil Pemeriksaan Pengadaan",
-  ],
-  4: [
-    "SOP Manajemen Kepegawaian",
-    "Dokumen Mutasi Jabatan",
-    "Laporan Penilaian Kinerja Pegawai",
-    "Dokumen Penerimaan Pegawai",
-  ],
-  5: [
-    "SOP Pelayanan Publik",
-    "Standar Pelayanan Minimal (SPM)",
-    "Laporan Kepuasan Masyarakat",
-    "Dokumen Maklumat Pelayanan",
-    "SOP Pengaduan Masyarakat",
-    "Buku Regulasi Pelayanan",
-    "Dokumen Inovasi Pelayanan",
-  ],
-  6: [
-    "SOP Pengelolaan Aset",
-    "Dokumen Inventarisasi Aset",
-    "Laporan Pemanfaatan Aset",
-  ],
-  7: [
-    "Laporan Kinerja Pengawasan",
-    "Dokumen Tindak Lanjut Hasil Pengawasan",
-  ],
-};
-
-function generateMockSubmissions(): Submission[] {
-  const mockData: Submission[] = [];
-  const now = new Date();
-
-  for (const opdName of MOCK_OPD_NAMES) {
-    for (let areaId = 1; areaId <= 7; areaId++) {
-      const docs = MOCK_DOCUMENTS_PER_AREA[areaId] || [];
-      for (const docName of docs) {
-        const randomVal = Math.random();
-        const status: DocStatus = randomVal > 0.35 ? "TERPENUHI" : "BELUM_TERPENUHI";
-        mockData.push({
-          id: `mock-${opdName}-${areaId}-${docName}`.replace(/\s+/g, "-").toLowerCase(),
-          opdName,
-          areaId,
-          documentName: docName,
-          status,
-          fileUrl: status === "TERPENUHI" ? `https://storage.example.com/files/${opdName}/${areaId}/${docName}.pdf` : null,
-          workpaperUrl: status === "TERPENUHI" ? `https://storage.example.com/workpapers/${opdName}/${areaId}/${docName}.pdf` : null,
-          note: status === "TERPENUHI" ? "Dokumen diunggah sesuai jadwal" : "Masih dalam proses penyusunan",
-          submittedBy: status === "TERPENUHI" ? `admin.${opdName.split(" ")[0].toLowerCase()}@konawekab.go.id` : null,
-          createdAt: now,
-          updatedAt: now,
-          assessmentYear: ACTIVE_ASSESSMENT_YEAR,
-          period: ACTIVE_PERIOD,
-          verificationStatus: "BELUM_DIVERIFIKASI",
-          verifiedBy: null,
-          verifiedAt: null,
-          verificationNote: null,
-        });
-      }
-    }
-  }
-
-  return mockData;
-}
-
-const GLOBAL_MOCK_SUBMISSIONS = generateMockSubmissions();
 
 export async function upsertSubmission(
   opdName: string,
@@ -164,6 +77,9 @@ export async function upsertSubmission(
   if (status === "TERPENUHI" && !fileUrl && !workpaperUrl) {
     return { success: false, error: "Bukti terpenuhi harus memiliki file atau URL bukti." };
   }
+  if ((fileUrl && !isGoogleEvidenceUrl(fileUrl)) || (workpaperUrl && !isGoogleEvidenceUrl(workpaperUrl))) {
+    return { success: false, error: "URL eviden harus berasal dari Google Drive, Google Docs, Sheets, atau Slides." };
+  }
 
   try {
     const existing = await prisma.submission.findUnique({
@@ -174,8 +90,8 @@ export async function upsertSubmission(
         where: { opdName_areaId_documentName_assessmentYear_period: { opdName, areaId, documentName, assessmentYear, period } },
         update: {
           status,
-          fileUrl: fileUrl ?? undefined,
-          workpaperUrl: workpaperUrl ?? undefined,
+          fileUrl: status === "BELUM_TERPENUHI" ? null : fileUrl ?? undefined,
+          workpaperUrl: status === "BELUM_TERPENUHI" ? null : workpaperUrl ?? undefined,
           note: note ?? undefined,
           submittedBy: user.userId,
           assessmentYear,
@@ -240,10 +156,14 @@ export async function upsertSubmission(
 }
 
 export async function getSubmissionsByOPD(opdName?: string): Promise<Submission[]> {
+  const user = await getCurrentUser();
+  if (!user) return [];
+  const scopedOPD = user.role === "ADMIN_OPD" ? user.opdName : opdName;
+  if (user.role === "ADMIN_OPD" && (!user.opdName || (opdName && opdName !== user.opdName))) return [];
   try {
     const orderBy = [{ opdName: "asc" as const }, { areaId: "asc" as const }, { documentName: "asc" as const }];
-    const submissions = opdName
-      ? await prisma.submission.findMany({ where: { opdName }, orderBy })
+    const submissions = scopedOPD
+      ? await prisma.submission.findMany({ where: { opdName: scopedOPD }, orderBy })
       : await prisma.submission.findMany({ orderBy });
     return submissions;
   } catch (dbError) {
@@ -256,9 +176,11 @@ export async function getSubmissionsByOPD(opdName?: string): Promise<Submission[
 }
 
 export async function getSubmissionsByArea(areaId: number): Promise<Submission[]> {
+  const user = await getCurrentUser();
+  if (!user) return [];
   try {
     const submissions = await prisma.submission.findMany({
-      where: { areaId },
+      where: { areaId, ...(user.role === "ADMIN_OPD" && user.opdName ? { opdName: user.opdName } : {}) },
       orderBy: [{ opdName: "asc" }, { documentName: "asc" }],
     });
     return submissions;
@@ -284,26 +206,33 @@ export async function verifySubmission(
   try {
     const existing = await prisma.submission.findUnique({ where: { id: submissionId } });
     if (!existing) return { success: false, error: "Submission tidak ditemukan." };
-    const updated = await prisma.submission.update({
-      where: { id: submissionId },
-      data: {
-        verificationStatus,
-        verifiedBy: user.userId,
-        verifiedAt: new Date(),
-        verificationNote: verificationNote?.trim() || null,
-      },
+    if (verificationStatus === "DIVERIFIKASI" && (existing.status !== "TERPENUHI" || (!existing.fileUrl && !existing.workpaperUrl))) {
+      return { success: false, error: "Bukti harus berstatus TERPENUHI dan memiliki eviden sebelum diverifikasi." };
+    }
+    const result = await prisma.$transaction(async (transaction) => {
+      const updated = await transaction.submission.update({
+        where: { id: submissionId },
+        data: {
+          verificationStatus,
+          verifiedBy: user.userId,
+          verifiedAt: new Date(),
+          verificationNote: verificationNote?.trim() || null,
+        },
+      });
+      await transaction.auditLog.create({
+        data: {
+          entityType: "Submission",
+          entityId: submissionId,
+          action: "VERIFY",
+          actorId: user.userId,
+          beforeData: JSON.parse(JSON.stringify(existing)),
+          afterData: JSON.parse(JSON.stringify(updated)),
+          reason: verificationNote?.trim() || undefined,
+        },
+      });
+      return updated;
     });
-    await prisma.auditLog.create({
-      data: {
-        entityType: "Submission",
-        entityId: submissionId,
-        action: "VERIFY",
-        actorId: user.userId,
-        beforeData: JSON.parse(JSON.stringify(existing)),
-        afterData: JSON.parse(JSON.stringify(updated)),
-        reason: verificationNote?.trim() || undefined,
-      },
-    });
+    void result;
     return { success: true };
   } catch (error) {
     console.error("[submissions.actions.ts] verifySubmission failed:", error);
@@ -312,6 +241,8 @@ export async function verifySubmission(
 }
 
 export async function getAllSubmissions(): Promise<Submission[]> {
+  const user = await getCurrentUser();
+  if (!user || user.role !== "ADMIN_UTAMA") return [];
   try {
     const submissions = await prisma.submission.findMany({
       orderBy: [{ opdName: "asc" }, { areaId: "asc" }, { documentName: "asc" }],

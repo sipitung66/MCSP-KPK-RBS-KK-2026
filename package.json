@@ -3,12 +3,13 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "prisma db push --skip-generate && next dev",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
     "postinstall": "prisma generate",
     "db:push": "prisma db push",
+    "db:prepare": "prisma db push --skip-generate",
     "db:seed": "tsx prisma/seed.ts",
     "shadcn": "npx shadcn@latest"
   },

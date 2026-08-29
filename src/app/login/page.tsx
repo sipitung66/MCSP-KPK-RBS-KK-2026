@@ -55,8 +55,8 @@ export default function LoginPage() {
           <div className="w-full max-w-[410px]">
             <div className="mb-7 text-center">
               <div className="mb-5 flex items-center justify-center gap-5" aria-label="Logo KPK dan Kabupaten Konawe">
-                <Image src="/logos/kpk clean.jpg" alt="Logo KPK" width={48} height={54} className="h-[54px] w-auto object-contain" priority unoptimized />
-                <Image src="/logos/konawe clean.png" alt="Logo Kabupaten Konawe" width={48} height={54} className="h-[54px] w-auto object-contain" priority unoptimized />
+                <Image src="/logos/kpk clean.jpg" alt="Logo KPK" width={48} height={54} className="h-[54px] w-auto object-contain" style={{ width: "auto", height: "54px" }} priority unoptimized />
+                <Image src="/logos/konawe clean.png" alt="Logo Kabupaten Konawe" width={48} height={54} className="h-[54px] w-auto object-contain" style={{ width: "auto", height: "54px" }} priority unoptimized />
               </div>
               <Image src="/logos/Logo MCSP KPK RBS.jpg" alt="Logo MCSP KPK RBS" width={112} height={58} className="mx-auto mb-5 h-[58px] w-28 object-contain" priority unoptimized />
               <h2 className="text-[25px] font-bold tracking-tight text-[#092b4d]">MCP KPK</h2>

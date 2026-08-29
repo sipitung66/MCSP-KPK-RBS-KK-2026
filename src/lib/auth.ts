@@ -1,6 +1,7 @@
 import { SignJWT, jwtVerify, type JWTPayload } from "jose";
 import { cookies } from "next/headers";
 import type { UserRole } from "@prisma/client";
+import { prisma } from "@/lib/prisma";
 
 export const SESSION_COOKIE_NAME = "mcsp_session";
 const SESSION_DURATION = "7d";
@@ -69,12 +70,18 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
   const session = await verifySession();
   if (!session) return null;
 
-  return {
-    userId: session.userId,
-    email: session.email,
-    role: session.role,
-    opdName: session.opdName,
-  };
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: session.userId },
+      select: { id: true, email: true, role: true, opdName: true },
+    });
+    if (!user || user.email !== session.email || user.role !== session.role || user.opdName !== (session.opdName ?? null)) {
+      return null;
+    }
+    return { userId: user.id, email: user.email, role: user.role, opdName: user.opdName ?? undefined };
+  } catch {
+    return null;
+  }
 }
 
 export async function setSessionCookie(token: string): Promise<void> {

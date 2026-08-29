@@ -12,7 +12,7 @@ import {
   calculateWeightedRequirementCompletion,
   type WeightedRequirement,
 } from "@/lib/calculations";
-import { getRequiredDocumentsForOPD, type TaggingHierarchy } from "@/lib/mcsp-rbs";
+import { getRequiredDocumentsForOPD, MCSP_AREA_OPTIONS, type TaggingHierarchy } from "@/lib/mcsp-rbs";
 import type { OPDTaggingOverrides } from "@/lib/mcsp-rbs";
 import type {
   GlobalSummary,
@@ -242,16 +242,22 @@ export async function getDashboardSummary(): Promise<DashboardSummary> {
       areaList,
     };
   } catch (dbError) {
-    console.warn("[dashboard.actions.ts] getDashboardSummary DB error, using mock:", dbError instanceof Error ? dbError.message : String(dbError));
-    return generateMockDashboardSummary();
+    console.error("[dashboard.actions.ts] getDashboardSummary failed:", dbError);
+    // Return empty data instead of mock data
+    return {
+      globalSummary: { totalTarget: 0, totalTerpenuhi: 0, persentase: 0, ratioText: "0/0", status: "Belum Memadai" },
+      progresPerArea: [],
+      rasioOPD: [],
+      ews: { opdTerendah: [], areaGapTerbesar: [] },
+      totalOPD: 0,
+      totalArea: 0,
+      opdList: [],
+      areaList: [],
+    };
   }
 }
 
 export async function getDashboardSummaryForOPD(opdName: string): Promise<OPDSpecificSummary> {
-  let areaList: MCSPArea[];
-  let submissions: BaseSubmissionLite[];
-  let fetchError = false;
-
   try {
     const [areasDb, subsDb, tagProfiles] = await Promise.all([
       prisma.mCSPArea.findMany(),
@@ -266,8 +272,8 @@ export async function getDashboardSummaryForOPD(opdName: string): Promise<OPDSpe
       }),
       prisma.oPDTagProfile.findMany({ where: { opdName }, include: { area: { select: { areaName: true } } } }),
     ]);
-    areaList = areasDb;
-    submissions = subsDb;
+    const areaList = areasDb;
+    const submissions = subsDb;
     const taggingOverrides = buildTaggingOverrides(tagProfiles.map((profile) => ({
       ...profile,
       areaName: profile.area.areaName,
@@ -293,58 +299,19 @@ export async function getDashboardSummaryForOPD(opdName: string): Promise<OPDSpe
       persentase: weighted.percent,
     };
   } catch (dbError) {
-    console.warn("[dashboard.actions.ts] getDashboardSummaryForOPD DB error, using mock:", dbError instanceof Error ? dbError.message : String(dbError));
-    fetchError = true;
-    areaList = MOCK_AREAS;
-    submissions = GLOBAL_MOCK_SUBMISSIONS_LITE.filter((s) => s.opdName === opdName);
+    console.error("[dashboard.actions.ts] getDashboardSummaryForOPD failed:", dbError);
+    // Return empty data instead of mock data
+    return {
+      opdName,
+      globalSummary: { totalTarget: 0, totalTerpenuhi: 0, persentase: 0, ratioText: "0/0", status: "Belum Memadai" },
+      progresPerArea: [],
+      statusKepatuhan: "Belum Memadai",
+      rasioTeks: "0/0",
+      totalTerpenuhi: 0,
+      totalTarget: 0,
+      persentase: 0,
+    };
   }
-
-  if (fetchError && submissions.length === 0) {
-    const docCounts: Record<number, number> = { 1: 5, 2: 3, 3: 5, 4: 4, 5: 7, 6: 3, 7: 2 };
-    submissions = [];
-    for (let areaId = 1; areaId <= 7; areaId++) {
-      const count = docCounts[areaId] || 3;
-      for (let i = 0; i < count; i++) {
-        submissions.push({
-          opdName,
-          areaId,
-          status: Math.random() > 0.35 ? "TERPENUHI" : "BELUM_TERPENUHI",
-        });
-      }
-    }
-  }
-
-  const requirementMap = buildWeightedRequirementMapForOPDs([{ id: 1, opdName, createdAt: new Date() }]);
-  const weighted = requirementMap[opdName]?.length
-    ? calculateWeightedRequirementCompletion(submissions, requirementMap[opdName])
-    : {
-        target: areaList.reduce((sum, a) => sum + a.targetDocs, 0),
-        completed: submissions.filter((s) => s.status === "TERPENUHI").length,
-        percent: hitungPersentase(submissions.filter((s) => s.status === "TERPENUHI").length, areaList.reduce((sum, a) => sum + a.targetDocs, 0)),
-      };
-
-  const totalTarget = weighted.target;
-  const totalTerpenuhi = weighted.completed;
-  const persentase = weighted.percent;
-  const statusKepatuhan = getStatusKepatuhan(persentase);
-  const rasioTeks = hitungRasioTeks(totalTerpenuhi, totalTarget);
-
-  const singleOPDSubmissions = submissions;
-  const areaRequirementMap = buildAggregatedAreaWeightedRequirements([{ id: 1, opdName, createdAt: new Date() }]);
-  const progresPerArea = hitungProgresPerArea(singleOPDSubmissions, areaList, areaRequirementMap);
-
-  const globalSummary = hitungKumulatifGlobal(singleOPDSubmissions, areaList, 1, requirementMap);
-
-  return {
-    opdName,
-    globalSummary,
-    progresPerArea,
-    statusKepatuhan,
-    rasioTeks,
-    totalTerpenuhi,
-    totalTarget,
-    persentase,
-  };
 }
 
 export async function getAllOPDList(): Promise<OPDList[]> {
@@ -352,17 +319,31 @@ export async function getAllOPDList(): Promise<OPDList[]> {
     const opds = await prisma.oPDList.findMany({ orderBy: { opdName: "asc" } });
     return opds;
   } catch (dbError) {
-    console.warn("[dashboard.actions.ts] getAllOPDList DB error, using mock:", dbError instanceof Error ? dbError.message : String(dbError));
-    return [...MOCK_OPD_LIST].sort((a, b) => a.opdName.localeCompare(b.opdName));
+    console.error("[dashboard.actions.ts] getAllOPDList failed:", dbError);
+    throw new Error("OPD data is unavailable.");
   }
 }
 
 export async function getAllAreas(): Promise<MCSPArea[]> {
   try {
     const areas = await prisma.mCSPArea.findMany({ orderBy: { id: "asc" } });
-    return areas;
+    if (areas.length > 0) return areas;
+
+    return MCSP_AREA_OPTIONS.map((area) => ({
+      id: area.id,
+      areaName: area.areaName,
+      targetDocs: 0,
+      description: null,
+      createdAt: new Date(),
+    }));
   } catch (dbError) {
-    console.warn("[dashboard.actions.ts] getAllAreas DB error, using mock:", dbError instanceof Error ? dbError.message : String(dbError));
-    return [...MOCK_AREAS].sort((a, b) => a.id - b.id);
+    console.error("[dashboard.actions.ts] getAllAreas failed:", dbError);
+    return MCSP_AREA_OPTIONS.map((area) => ({
+      id: area.id,
+      areaName: area.areaName,
+      targetDocs: 0,
+      description: null,
+      createdAt: new Date(),
+    }));
   }
 }
